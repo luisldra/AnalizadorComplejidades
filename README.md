@@ -35,6 +35,8 @@ tests/test_complexity_suma.py Complejidad: O(n)
 tests/test_parser.py <src.ast.nodes.Program object at 0x...>
 .
 ```
+---
+
 ## 📌 Ejemplos de pseudocódigo soportado
 Asignación
 function identidad(n)
@@ -64,11 +66,12 @@ begin
         return b
     end
 end
-
+---
 ##👨‍💻 Autores
 Luis Rodríguez – Proyecto académico para la materia Análisis y Diseño de Algoritmos.
 Yonier
 
 ---
+
 
 
