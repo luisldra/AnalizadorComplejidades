@@ -1,3 +1,21 @@
-venv/
+# Archivos de Python
 __pycache__/
 *.pyc
+*.pyo
+*.pyd
+
+# Cachés de pytest
+.pytest_cache/
+
+# Entornos virtuales
+venv/
+.env/
+
+# Configuración de editores
+.vscode/
+.idea/
+
+# Archivos temporales
+*.log
+.DS_Store
+Thumbs.db
