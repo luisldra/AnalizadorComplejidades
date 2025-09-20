@@ -1,0 +1,116 @@
+// =======================
+// Grammar for pseudocode
+// =======================
+
+start: function+
+
+// -------- Functions --------
+function: "function" NAME "(" params? ")" block
+params: NAME ("," NAME)*
+
+// -------- Blocks --------
+block: "begin" statement* "end"
+
+// -------- Statements --------
+statement: assignment
+         | array_assignment
+         | matrix_assignment  
+         | array_declaration
+         | matrix_declaration
+         | if_statement
+         | while_statement
+         | for_statement
+         | repeat_statement
+         | return_statement
+         | call_statement
+         | COMMENT
+
+// -------- Assignment --------
+assignment: NAME ASSIGN expr
+
+// -------- Arrays --------
+array_assignment: NAME "[" expr "]" ASSIGN expr
+array_declaration: "array" NAME "[" expr "]"
+
+// -------- Matrices --------
+matrix_assignment: NAME "[" expr "]" "[" expr "]" ASSIGN expr
+matrix_declaration: "matrix" NAME "[" expr "]" "[" expr "]"
+
+// -------- If --------
+if_statement: "if" "(" bool_expr ")" "then" block ("else" block)?
+
+// -------- While --------
+while_statement: "while" "(" bool_expr ")" "do" block
+
+// -------- For --------
+for_statement: "for" NAME ASSIGN expr "to" expr "do" block
+
+// -------- Repeat --------
+repeat_statement: "repeat" block "until" "(" bool_expr ")"
+
+// -------- Return --------
+return_statement: "return" expr
+
+// -------- Call --------
+call_statement: "call" NAME "(" args? ")"
+args: expr ("," expr)*
+
+// -------- Expressions --------
+?expr: bool_expr
+
+?bool_expr: bool_term
+          | bool_expr OR bool_term  -> bool_or
+
+?bool_term: bool_factor
+          | bool_term AND bool_factor -> bool_and
+
+?bool_factor: bool_atom
+            | NOT bool_factor -> bool_not
+
+?bool_atom: comparison
+          | arith_expr  
+          | "true"  -> bool_true
+          | "false" -> bool_false
+          | "(" bool_expr ")"
+
+?comparison: arith_expr comparator arith_expr -> condition
+
+?arith_expr: term
+           | arith_expr "+" term   -> add
+           | arith_expr "-" term   -> sub
+
+?term: factor
+     | term "*" factor -> mul
+     | term "/" factor -> div
+
+?factor: NUMBER
+       | NAME
+       | NAME "[" expr "]"   -> array_access
+       | NAME "[" expr "]" "[" expr "]" -> matrix_access
+       | "call" NAME "(" args? ")"  -> call_expr
+       | "(" arith_expr ")"
+
+?comparator: EQUAL | NEQ | LT | GT | LE | GE
+
+// -------- Tokens --------
+ASSIGN: /\U0001F868/ 
+COMMENT: "►" /[^\n]/*
+%ignore COMMENT
+
+// Boolean operators (must come before NAME)
+AND: "and"
+OR: "or"
+NOT: "not"
+
+// Comparison operators
+EQUAL: "="
+NEQ: "!="
+LT: "<" 
+GT: ">"
+LE: "<="
+GE: ">="
+
+NAME: /[a-zA-Z_][a-zA-Z0-9_]*/
+NUMBER: /\d+/
+
+%ignore /[ \t\r\n]+/

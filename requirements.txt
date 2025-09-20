@@ -1,0 +1,7 @@
+lark-parser      # Parsing con gramática (puedes usar ANTLR también)
+sympy            # Manipulación simbólica y resolución de recurrencias
+networkx         # Grafos (CFG, árboles de recurrencia)
+graphviz         # Visualización de grafos
+pytest           # Testing
+fastapi          # API REST (opcional, si quieres exponer servicio)
+uvicorn          # Servidor ASGI para FastAPI
