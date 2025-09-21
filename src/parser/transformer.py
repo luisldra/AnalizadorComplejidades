@@ -7,7 +7,7 @@ class ASTTransformer(Transformer):
     def start(self, *functions):
         return Program(list(functions))
 
-    def function(self, name, *args):
+    def function(self, function_token, name, *args):
         # Handle optional params: either (name, params, body) or (name, body)
         # Convert name properly - it might be a Var object or string
         func_name = name.name if hasattr(name, 'name') else str(name)
@@ -24,7 +24,9 @@ class ASTTransformer(Transformer):
     def params(self, *params):
         return [str(p) for p in params]
 
-    def block(self, *statements):
+    def block(self, begin_token, *statements_and_end):
+        # Remove the END token from the end
+        statements = statements_and_end[:-1] if statements_and_end else []
         return list(statements)
     
     def statement(self, stmt):
@@ -39,17 +41,37 @@ class ASTTransformer(Transformer):
     def while_statement(self, cond, body):
         return While(cond, body)
 
-    def if_statement(self, cond, then_body, *else_body):
-        return If(cond, then_body, else_body[0] if else_body else None)
+    def if_statement(self, *args):
+        # Handle different if statement formats
+        if len(args) == 6:
+            # IF cond THEN body ELSE body
+            if_token, cond, then_token, then_body, else_token, else_body = args
+            return If(cond, then_body, else_body)
+        elif len(args) == 5:
+            # IF cond body ELSE body
+            if_token, cond, then_body, else_token, else_body = args
+            return If(cond, then_body, else_body)
+        elif len(args) == 4:
+            # IF cond THEN body
+            if_token, cond, then_token, then_body = args
+            return If(cond, then_body, None)
+        elif len(args) == 3:
+            # IF cond body
+            if_token, cond, then_body = args
+            return If(cond, then_body, None)
+        else:
+            raise ValueError(f"Unexpected if_statement arguments: {args}")
 
     def repeat_statement(self, body, cond):
         return Repeat(body, cond)
 
-    def return_statement(self, expr):
+    def return_statement(self, return_token, expr):
         return Return(expr)
 
     def call_statement(self, name, args=None):
-        return Call(str(name), args or [])
+        # Handle name properly - it might be a Var object or string
+        call_name = name.name if hasattr(name, 'name') else str(name)
+        return Call(call_name, args or [])
 
     def args(self, *args):
         return list(args)
@@ -77,6 +99,15 @@ class ASTTransformer(Transformer):
     def condition(self, left, comparator, right):
         return Condition(left, str(comparator), right)
     
+    def var_condition(self, var, comparator, expr):
+        return Condition(Var(str(var)), str(comparator), expr)
+    
+    def expr_var_condition(self, expr, comparator, var):
+        return Condition(expr, str(comparator), Var(str(var)))
+    
+    def var_bool(self, var):
+        return Var(str(var))
+    
     def comparator(self, *args):
         # Debug: see what we're getting
         if args:
@@ -86,8 +117,10 @@ class ASTTransformer(Transformer):
             return "<"  # Default fallback
 
     # ---- call expressions ----
-    def call_expr(self, name, args=None):
-        return Call(str(name), args or [])
+    def call_expr(self, call_token, name, args=None):
+        # Handle name properly - it might be a Var object or string
+        call_name = name.name if hasattr(name, 'name') else str(name)
+        return Call(call_name, args or [])
 
     # ---- arrays ----
     def array_assignment(self, name, index, _assign, expr):

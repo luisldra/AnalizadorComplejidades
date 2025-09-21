@@ -1,7 +1,7 @@
 from lark import Lark
 from src.parser.transformer import ASTTransformer
 
-with open("src/parser/grammar.lark") as f:
+with open("src/parser/grammar.lark", encoding='utf-8') as f:
     grammar = f.read()
 
 parser = Lark(grammar, start="start", parser="earley")
