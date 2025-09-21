@@ -1,0 +1,18 @@
+function merge_sort(arr, left, right)
+begin
+    if left < right
+    begin
+        middle = (left + right) / 2
+        call merge_sort(arr, left, middle)
+        call merge_sort(arr, middle + 1, right)
+        call merge(arr, left, middle, right)
+    end
+end
+
+function merge(arr, left, middle, right)
+begin
+    for i = left to right do
+    begin
+        arr[i] = merged_value
+    end
+end

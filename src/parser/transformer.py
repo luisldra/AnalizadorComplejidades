@@ -35,7 +35,7 @@ class ASTTransformer(Transformer):
     def assignment(self, name, _assign, expr):
         return Assignment(str(name), expr)
 
-    def for_statement(self, name, _assign, start, end, body):
+    def for_statement(self, _for, name, _assign, start, _to, end, _do, body):
         return For(str(name), start, end, body)
 
     def while_statement(self, cond, body):

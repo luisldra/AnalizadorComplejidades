@@ -1,0 +1,15 @@
+function algoritmo_complejo(n)
+begin
+    s = 0
+    for i = 1 to n do
+    begin
+        for j = 1 to n do
+        begin
+            for k = 1 to n do
+            begin
+                s = s + i * j * k
+            end
+        end
+    end
+    return s
+end
