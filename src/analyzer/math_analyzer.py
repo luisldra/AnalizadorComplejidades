@@ -1,0 +1,663 @@
+"""
+Mathematical Complexity Analyzer
+================================
+
+This module implements a complexity analyzer based on formal mathematical
+derivation of cost functions from the algorithm's AST. It uses symbolic
+mathematics to build and solve cost equations.
+
+Author: Gemini
+Date: November 2025
+"""
+
+import re
+import sympy
+from src.ast.nodes import *
+from typing import Dict, Any, Optional, List
+
+from src.analyzer.recurrence_solver import RecursiveAlgorithmAnalyzer
+
+class MathematicalAnalyzer:
+    """
+    Performs complexity analysis by walking the AST and building a
+    symbolic cost function.
+    """
+    def __init__(self):
+        self.n = sympy.Symbol('n', positive=True)
+        self.T = sympy.Function('T')
+        self.function_costs: Dict[str, sympy.Expr] = {}
+        self.symbol_tables: Dict[str, Dict[str, sympy.Expr]] = {}
+        self.function_metadata: Dict[str, Dict[str, Any]] = {}
+        self.recursive_analyzer = RecursiveAlgorithmAnalyzer()
+        self.current_function: Optional[str] = None
+        self.last_raw_results: Dict[str, Any] = {}
+
+    def analyze(self, program_node: Program) -> Dict[str, Any]:
+        if not isinstance(program_node, Program):
+            raise TypeError("Expected a Program node.")
+
+        for func in program_node.functions:
+            self.function_costs[func.name] = sympy.Function(f"T_{func.name}")(self.n)
+            self.symbol_tables[func.name] = {}
+            self.function_metadata[func.name] = self.recursive_analyzer.analyze_recursive_algorithm(func)
+
+        raw_results: Dict[str, Any] = {}
+        for func in program_node.functions:
+            self.current_function = func.name
+            cost_or_eq = self._get_cost(func, current_func_name=func.name)
+            normalized = self._normalize_recursive_terms(cost_or_eq, func.name)
+            raw_results[func.name] = normalized
+
+        # Second pass: solve the equations
+        self.last_raw_results = raw_results.copy()
+        final_complexities: Dict[str, Any] = {}
+        for name, result in raw_results.items():
+            final_complexities[name] = self.solve(result, func_name=name)
+
+        return final_complexities
+
+    def solve(self, expr_or_eq: Any, func_name: Optional[str] = None) -> Any:
+        """
+        Solves the symbolic expression or equation to find the
+        asymptotic complexity (Big O).
+        """
+        try:
+            if isinstance(expr_or_eq, sympy.Eq):
+                return self.solve_recurrence(expr_or_eq, func_name=func_name)
+            
+            elif isinstance(expr_or_eq, sympy.Expr):
+                simplified = self._normalize_order_expr(sympy.simplify(expr_or_eq))
+                return sympy.O(simplified, (self.n, sympy.oo))
+            
+            else:
+                return "Unknown result type"
+        except Exception as e:
+            return f"Error during solving: {e}"
+
+    def solve_recurrence(self, eq: sympy.Eq, func_name: Optional[str] = None) -> Any:
+        """
+        Solves a recurrence relation equation.
+        It tries a direct symbolic solve with rsolve, and falls back to the
+        Master Theorem for divide-and-conquer recurrences.
+        """
+        try:
+            # First, attempt to solve with rsolve for linear recurrences
+            solution = sympy.rsolve(eq, self.T(self.n))
+            if solution:
+                try:
+                    simplified = self._normalize_order_expr(sympy.simplify(solution.expand()))
+                    return sympy.O(simplified, (self.n, sympy.oo))
+                except NotImplementedError:
+                    fallback_eq = self._fallback_from_equation(eq)
+                    if fallback_eq:
+                        return fallback_eq
+                    fallback = self._fallback_complexity(func_name)
+                    if fallback:
+                        return fallback
+        except (ValueError, NotImplementedError):
+            # Fall through to Master Theorem if rsolve fails (e.g., for T(n/2))
+            pass
+
+        # Try Master Theorem for Divide and Conquer
+        a, b, f_n, is_div_conquer = self._extract_master_theorem_params(eq)
+
+        if not is_div_conquer:
+            fallback_eq = self._fallback_from_equation(eq)
+            if fallback_eq:
+                return fallback_eq
+            fallback = self._fallback_complexity(func_name)
+            if fallback:
+                return fallback
+            return "Recurrence is not in a solvable form (linear or D&C)"
+
+        if a < 1 or b <= 1:
+            fallback_eq = self._fallback_from_equation(eq)
+            if fallback_eq:
+                return fallback_eq
+            fallback = self._fallback_complexity(func_name)
+            if fallback:
+                return fallback
+            return "Invalid parameters for Master Theorem (a>=1, b>1)"
+
+        try:
+            log_b_a = sympy.log(a, b)
+            
+            # Determine the critical exponent
+            critical_exponent = sympy.sympify(log_b_a)
+
+            # Compare f(n) with n^log_b(a)
+            # We use limits to determine the relationship
+            ratio_limit = sympy.limit(f_n / (self.n**critical_exponent), self.n, sympy.oo)
+
+            if ratio_limit == 0:
+                # Case 1: f(n) is polynomially smaller
+                return sympy.O(self.n**critical_exponent, (self.n, sympy.oo))
+            
+            elif ratio_limit.is_finite and ratio_limit > 0:
+                # Case 2: f(n) is of the same order
+                return sympy.O(self.n**critical_exponent * sympy.log(self.n), (self.n, sympy.oo))
+
+            elif ratio_limit == sympy.oo:
+                # Case 3: f(n) is polynomially larger
+                # We should check the regularity condition a*f(n/b) <= c*f(n) for c < 1
+                # but we will assume it holds for this implementation.
+                return sympy.O(f_n, (self.n, sympy.oo))
+            
+            else:
+                return f"Could not determine Master Theorem case for limit={ratio_limit}"
+
+        except Exception as e:
+            fallback_eq = self._fallback_from_equation(eq)
+            if fallback_eq:
+                return fallback_eq
+            fallback = self._fallback_complexity(func_name)
+            if fallback:
+                return fallback
+            return f"Error applying Master Theorem: {e}"
+
+    def _generate_tree_textual_analysis(self, eq: sympy.Eq) -> str:
+        """
+        Generates a textual analysis of the recurrence tree.
+        """
+        analysis = ""
+        
+        a_val, b_val, f_n, is_div_conquer = self._extract_master_theorem_params(eq)
+
+        if is_div_conquer:
+            log_b_a = sympy.log(a_val, b_val)
+            
+            analysis += "  REPRESENTACIÓN TEXTUAL DE LOS PRIMEROS 3 NIVELES:\n"
+            analysis += "  " + "─" * 114 + "\n\n"
+            
+            # Nivel 0
+            analysis += f"  Nivel 0 (Raíz): T(n)                                     │ Costo: {f_n}\n"
+            
+            # Nivel 1
+            cost_l1 = f_n.subs(self.n, self.n/b_val)
+            analysis += f"  Nivel 1: {a_val} nodos T(n/{b_val})                      │ Costo Total: {a_val} * {cost_l1}\n"
+            
+            # Nivel 2
+            cost_l2 = f_n.subs(self.n, self.n/(b_val**2))
+            analysis += f"  Nivel 2: {a_val**2} nodos T(n/{b_val**2})                  │ Costo Total: {a_val**2} * {cost_l2}\n\n"
+            
+            analysis += "  " + "─" * 114 + "\n\n"
+            
+            # Generalización
+            k = sympy.Symbol('k')
+            analysis += "  GENERALIZACIÓN - Nivel k-ésimo:\n"
+            analysis += f"    • Número de nodos: {a_val}^k\n"
+            analysis += f"    • Tamaño del problema por nodo: n / ({b_val}^k)\n"
+            cost_per_node_k = f_n.subs(self.n, self.n/(b_val**k))
+            cost_total_k = (a_val**k) * cost_per_node_k
+            analysis += f"    • Costo por nodo: {cost_per_node_k}\n"
+            analysis += f"    • Costo total en nivel k: {cost_total_k}\n\n"
+            
+            # Altura
+            analysis += "  ALTURA DEL ÁRBOL (h):\n"
+            analysis += f"    • h = log_{b_val}(n)\n\n"
+            
+            # Costo total
+            analysis += "  COSTO TOTAL:\n"
+            if sympy.Abs(log_b_a - sympy.log(a_val,b_val)).evalf() < 1e-9:
+                 analysis += f"    • Caso 1 del Teorema Maestro: T(n) = Θ({self.n}**{log_b_a})\n"
+            elif sympy.Abs(log_b_a - sympy.log(a_val,b_val)).evalf() > 1e-9:
+                 analysis += f"    • Caso 3 del Teorema Maestro: T(n) = Θ({f_n})\n"
+            else:
+                 analysis += f"    • Caso 2 del Teorema Maestro: T(n) = Θ({self.n}**{log_b_a} * log(n))\n"
+
+        else:
+            linear_params = self._extract_linear_recurrence_params(eq)
+            if linear_params:
+                dec = linear_params['decrement']
+                work = linear_params['work']
+                analysis += "  REPRESENTACIÓN TEXTUAL DE LOS PRIMEROS NIVELES (Recursión lineal):\n"
+                analysis += "  " + "─" * 114 + "\n\n"
+                cost_level0 = work
+                analysis += f"  Nivel 0 (Raíz): T(n)                                     │ Costo: {cost_level0}\n"
+                max_levels = 3
+                for level in range(1, max_levels):
+                    size = sympy.simplify(self.n - dec * level)
+                    cost = work.subs(self.n, size) if work.has(self.n) else work
+                    size_str = f"T(n - {dec*level})"
+                    spacing = max(1, 38 - len(size_str))
+                    analysis += f"  Nivel {level}: {size_str}{' ' * spacing}│ Costo: {cost}\n"
+                analysis += "\n"
+                analysis += "  GENERALIZACIÓN - Nivel k-ésimo:\n"
+                analysis += f"    • Tamaño del subproblema: n - k*{dec}\n"
+                analysis += f"    • Costo por nodo: {work.subs(self.n, self.n - sympy.Symbol('k')*dec) if work.has(self.n) else work}\n"
+                analysis += f"    • Número de niveles (h) ≈ n/{dec}\n"
+                analysis += f"    • Nodos totales ≈ n/{dec}\n\n"
+                analysis += "  COSTO TOTAL:\n"
+                analysis += f"    • Se expanden ≈ n/{dec} niveles; el trabajo acumulado es Σ f(n - i*{dec}).\n"
+                analysis += "    • El motor matemático resuelve la recurrencia para obtener la cota final.\n"
+            else:
+                analysis = "El análisis textual del árbol de recurrencia solo está disponible para recurrencias de 'divide y vencerás' o lineales simples."
+
+        return analysis
+
+    def _extract_master_theorem_params(self, eq: sympy.Eq) -> tuple:
+        """
+        Helper to extract a, b, and f(n) from a recurrence relation.
+        Extracts parameters for Master Theorem: T(n) = a*T(n/b) + f(n)
+        """
+        a_val, b_val, f_n = sympy.S(1), sympy.S(1), sympy.S(0)
+        is_div_conquer = False
+        
+        rhs = eq.rhs
+        terms = sympy.Add.make_args(rhs) if isinstance(rhs, sympy.Add) else [rhs]
+        
+        rec_terms = [t for t in terms if t.has(self.T)]
+        non_rec_terms = [t for t in terms if not t.has(self.T)]
+        f_n = sympy.Add(*non_rec_terms) if non_rec_terms else sympy.S(0)
+
+        if rec_terms:
+            # Sum all coefficients of recursive terms to get 'a'
+            a_val = sympy.S(0)
+            b_val = None
+            
+            for rec_term in rec_terms:
+                if rec_term.is_Mul:
+                    coeff, rec_func = rec_term.as_coeff_Mul()
+                else:
+                    coeff, rec_func = sympy.S(1), rec_term
+                
+                a_val += coeff
+                
+                # Extract b from the recursive call argument
+                if isinstance(rec_func, sympy.Function) and rec_func.func == self.T and rec_func.args:
+                    arg_expr = rec_func.args[0]
+                    
+                    # Handle T(n/b) case: arg_expr = n/b = n * (1/b)
+                    if arg_expr.is_Mul and self.n in arg_expr.free_symbols:
+                        n_coeff = arg_expr.coeff(self.n)
+                        if n_coeff.is_Rational or n_coeff.is_Number:
+                            # n_coeff = 1/b, so b = 1/n_coeff
+                            candidate_b = 1 / n_coeff
+                            if b_val is None:
+                                b_val = candidate_b
+                            elif b_val != candidate_b:
+                                # Different b values, not a standard divide-and-conquer
+                                is_div_conquer = False
+                                break
+                            is_div_conquer = candidate_b > 1
+                    # Handle T(n^c) case (less common)
+                    elif arg_expr.is_Pow and arg_expr.base == self.n:
+                        exp = arg_expr.exp
+                        if exp.is_Rational and exp < 1:
+                            # n^exp = n^(1/b), so b = 1/exp
+                            candidate_b = 1 / exp
+                            if b_val is None:
+                                b_val = candidate_b
+                            elif b_val != candidate_b:
+                                is_div_conquer = False
+                                break
+                            is_div_conquer = candidate_b > 1
+                    else:
+                        # Not a divide-and-conquer form (e.g., T(n-1))
+                        is_div_conquer = False
+                        break
+            
+            if b_val is None:
+                is_div_conquer = False
+
+        return a_val, b_val, f_n, is_div_conquer
+
+    def _extract_linear_recurrence_params(self, eq: sympy.Eq) -> Optional[Dict[str, sympy.Expr]]:
+        """Detect linear recurrences of the form T(n) = T(n - k) + f(n)."""
+        if not isinstance(eq, sympy.Eq):
+            return None
+
+        rhs = eq.rhs
+        terms = sympy.Add.make_args(rhs) if isinstance(rhs, sympy.Add) else [rhs]
+
+        rec_terms = [t for t in terms if t.has(self.T)]
+        if len(rec_terms) != 1:
+            return None
+
+        rec_term = rec_terms[0]
+        if rec_term.is_Mul:
+            coeff, rec_func = rec_term.as_coeff_Mul()
+        else:
+            coeff, rec_func = sympy.S(1), rec_term
+
+        if coeff != 1 or not isinstance(rec_func, sympy.Function) or rec_func.func != self.T:
+            return None
+
+        arg_expr = rec_func.args[0]
+        decrement = sympy.simplify(self.n - arg_expr)
+        if not (decrement.is_Number and decrement > 0):
+            return None
+
+        work_terms = [t for t in terms if not t.has(self.T)]
+        work = sympy.Add(*work_terms) if work_terms else sympy.Integer(0)
+
+        return {"decrement": decrement, "work": work}
+
+    # ----------------------------------------------------
+    # Cost Visitor (_get_cost)
+    # ----------------------------------------------------
+
+    def _expr_has_recurrence(self, expr: Any) -> bool:
+        """Helper to detect if an expression contains the recurrence T()."""
+        if expr is None:
+            return False
+        try:
+            for subexpr in sympy.preorder_traversal(expr):
+                if isinstance(subexpr, sympy.Function) and subexpr.func == self.T:
+                    return True
+        except Exception:
+            # Fallback: string-based detection if traversal fails
+            return 'T(' in str(expr)
+        return False
+
+    def _get_cost(self, node: Node, current_func_name: Optional[str] = None) -> sympy.Expr:
+        """Generic cost visitor that dispatches to node-specific methods."""
+        method_name = f'_get_cost_{type(node).__name__}'
+        visitor = getattr(self, method_name, self._get_cost_default)
+        
+        # Pass context down if the visitor accepts it
+        import inspect
+        sig = inspect.signature(visitor)
+        if 'current_func_name' in sig.parameters:
+            return visitor(node, current_func_name=current_func_name)
+        else:
+            return visitor(node)
+
+    def _get_cost_default(self, node: Node) -> sympy.Expr:
+        return sympy.Integer(1)
+
+    def _safe_sum(self, costs: list) -> sympy.Expr:
+        """Safely sums a list of sympy expressions, ignoring Nones."""
+        return sum(c for c in costs if c is not None)
+
+    def _get_cost_Function(self, node: Function, current_func_name: str) -> sympy.Expr:
+        body_cost = self._safe_sum(self._get_cost(stmt, current_func_name=current_func_name) for stmt in node.body)
+        
+        # Check if the body_cost contains a recursive call (a T() term)
+        is_recursive = self._expr_has_recurrence(body_cost)
+        
+        if is_recursive:
+            # This is a recurrence relation: T(n) = body_cost
+            return sympy.Eq(self.T(self.n), body_cost)
+        else:
+            # This is a simple cost expression
+            return body_cost
+
+    def _get_cost_If(self, node: If, current_func_name: str) -> sympy.Expr:
+        condition_cost = self._get_cost(node.condition, current_func_name=current_func_name)
+        then_cost = self._safe_sum(self._get_cost(stmt, current_func_name=current_func_name) for stmt in node.then_body)
+        else_cost = self._safe_sum(self._get_cost(stmt, current_func_name=current_func_name) for stmt in node.else_body) if node.else_body else sympy.Integer(0)
+
+        then_has_rec = self._expr_has_recurrence(then_cost)
+        else_has_rec = self._expr_has_recurrence(else_cost)
+
+        if then_has_rec and else_has_rec:
+            branch_cost = sympy.Max(then_cost, else_cost)
+        elif then_has_rec:
+            branch_cost = then_cost
+        elif else_has_rec:
+            branch_cost = else_cost
+        else:
+            # For purely iterative branches, keep worst-case (Max)
+            try:
+                branch_cost = sympy.Max(then_cost, else_cost)
+            except Exception:
+                branch_cost = then_cost + else_cost
+
+        return condition_cost + branch_cost
+
+    def _get_cost_For(self, node: For, current_func_name: str) -> sympy.Expr:
+        loop_var = sympy.Symbol(node.var)
+        start_val = self._get_value(node.start)
+        end_val = self._get_value(node.end)
+        body_cost = self._safe_sum(self._get_cost(stmt, current_func_name=current_func_name) for stmt in node.body)
+        
+        if body_cost == 0:
+            return sympy.Integer(0)
+
+        # Calculate number of iterations: end - start + 1 (if both are numbers)
+        # For symbolic bounds, use Sum
+        try:
+            if isinstance(start_val, sympy.Number) and isinstance(end_val, sympy.Number):
+                num_iterations = end_val - start_val + 1
+                total_cost = num_iterations * body_cost
+            else:
+                # Symbolic bounds: use Sum
+                total_cost = sympy.Sum(body_cost, (loop_var, start_val, end_val)).doit()
+        except:
+            # Fallback: use Sum for any case
+            total_cost = sympy.Sum(body_cost, (loop_var, start_val, end_val)).doit()
+        
+        bounds_cost = self._get_cost(node.start, current_func_name) + self._get_cost(node.end, current_func_name)
+        return total_cost + bounds_cost
+
+    def _get_cost_While(self, node: While, current_func_name: str) -> sympy.Expr:
+        # While loops are harder to analyze statically
+        # We return a symbolic expression with k (number of iterations)
+        # The actual analysis would need to understand the loop condition
+        k = sympy.Symbol('k', real=True, positive=True)
+        condition_cost = self._get_cost(node.condition, current_func_name=current_func_name)
+        body_cost = self._safe_sum(self._get_cost(stmt, current_func_name=current_func_name) for stmt in node.body)
+        # Return k * (condition + body) - this represents worst-case iterations
+        return k * (condition_cost + body_cost)
+
+    def _get_cost_Assignment(self, node: Assignment, current_func_name: str) -> sympy.Expr:
+        return self._get_cost(node.expr, current_func_name=current_func_name) + 1
+
+    def _get_cost_Return(self, node: Return, current_func_name: str) -> sympy.Expr:
+        if node.expr:
+            return self._get_cost(node.expr, current_func_name=current_func_name)
+        return sympy.Integer(1)
+
+    def _get_cost_BinOp(self, node: BinOp, current_func_name: str) -> sympy.Expr:
+        return self._get_cost(node.left, current_func_name) + self._get_cost(node.right, current_func_name) + 1
+
+    def _get_cost_Condition(self, node: Condition, current_func_name: str) -> sympy.Expr:
+        return self._get_cost(node.left, current_func_name) + self._get_cost(node.right, current_func_name) + 1
+
+    def _get_cost_Call(self, node: Call, current_func_name: str) -> sympy.Expr:
+        arg_costs = self._safe_sum(self._get_cost(arg, current_func_name=current_func_name) for arg in node.args)
+        
+        # Check for recursion
+        if node.name == current_func_name:
+            # It's a recursive call. Represent it symbolically.
+            # We assume a single argument for simplicity for now.
+            if node.args:
+                symbolic_arg = self._get_value(node.args[0])
+                return arg_costs + self.T(symbolic_arg)
+            else:
+                # Recursion without argument change, e.g. T(n) = ... + T(n)
+                return arg_costs + self.T(self.n)
+        else:
+            # It's a call to another function. Look up its cost.
+            # This is a simplification; a full analysis would substitute the other function's cost function.
+            return arg_costs + self.function_costs.get(node.name, sympy.Integer(1))
+
+
+    def _get_cost_Var(self, node: Var) -> sympy.Expr:
+        return sympy.Integer(1)
+
+    def _get_cost_Number(self, node: Number) -> sympy.Expr:
+        return sympy.Integer(1)
+        
+    def _get_cost_Program(self, node: Program, current_func_name: Optional[str] = None) -> sympy.Expr:
+        return self._safe_sum(self._get_cost(func, current_func_name=func.name) for func in node.functions)
+
+    # ----------------------------------------------------
+    # Value Visitor (_get_value)
+    # ----------------------------------------------------
+
+    def _get_value(self, node: Node) -> Any:
+        """Generic value visitor that dispatches to node-specific methods."""
+        method_name = f'_get_value_{type(node).__name__}'
+        visitor = getattr(self, method_name, self._get_value_default)
+        return visitor(node)
+
+    def _get_value_default(self, node: Node) -> Any:
+        return sympy.Symbol(f"val_{type(node).__name__}")
+
+    def _get_value_BinOp(self, node: BinOp) -> sympy.Expr:
+        left = self._get_value(node.left)
+        right = self._get_value(node.right)
+        
+        if node.op == '+':
+            return left + right
+        elif node.op == '-':
+            return left - right
+        elif node.op == '*':
+            return left * right
+        elif node.op == '/':
+            return left / right
+        else:
+            # Unknown operator, default to addition
+            return left + right
+
+    def _get_value_Var(self, node: Var) -> sympy.Symbol:
+        if node.name == 'n':
+            return self.n
+        return sympy.Symbol(node.name)
+
+    def _get_value_Number(self, node: Number) -> sympy.Integer:
+        return sympy.Integer(node.value)
+
+    # ----------------------------------------------------
+    # Recurrence normalization helpers
+    # ----------------------------------------------------
+
+    def _normalize_recursive_terms(self, expr: Any, func_name: Optional[str]) -> Any:
+        if not isinstance(expr, sympy.Eq) or not func_name:
+            return expr
+
+        rhs = expr.rhs
+        recursive_terms: List[sympy.Function] = []
+        for subexpr in sympy.preorder_traversal(rhs):
+            if isinstance(subexpr, sympy.Function) and subexpr.func == self.T:
+                recursive_terms.append(subexpr)
+
+        if not recursive_terms:
+            return expr
+
+        inferred_args = self._get_recurrence_args_from_metadata(func_name, len(recursive_terms))
+        replacements = {}
+        for idx, term in enumerate(recursive_terms):
+            arg = term.args[0]
+            if arg.has(self.n):
+                continue
+            normalized_arg = inferred_args[idx] if idx < len(inferred_args) else self.n
+            replacements[term] = self.T(normalized_arg)
+
+        if replacements:
+            rhs = rhs.xreplace(replacements)
+            return sympy.Eq(expr.lhs, rhs, evaluate=False)
+        return expr
+
+    def _get_recurrence_args_from_metadata(self, func_name: str, count: int) -> List[sympy.Expr]:
+        metadata = self.function_metadata.get(func_name, {})
+        relation = metadata.get('recurrence_relation')
+        if not relation:
+            return []
+
+        clean = relation.replace(" ", "")
+        args: List[sympy.Expr] = []
+        pattern = re.compile(r'T\(n(?:(/)(\d+)|-(\d+))?\)')
+        for match in pattern.finditer(clean):
+            slash, divisor, decrement = match.groups()
+            if slash and divisor:
+                args.append(self.n / int(divisor))
+            elif decrement:
+                args.append(self.n - int(decrement))
+            else:
+                args.append(self.n)
+
+        if args:
+            # El primer término corresponde al lado izquierdo T(n); descartarlo
+            args = args[1:]
+
+        if not args:
+            args.append(self.n)
+
+        while len(args) < count:
+            args.append(args[-1])
+
+        return args
+
+    def _normalize_recursive_argument(self, arg_expr: sympy.Expr, func_name: str) -> sympy.Expr:
+        if arg_expr.has(self.n):
+            return arg_expr
+        inferred_args = self._get_recurrence_args_from_metadata(func_name, 1)
+        if inferred_args:
+            return inferred_args[0]
+        return self.n
+
+    def _normalize_order_expr(self, expr: sympy.Expr) -> sympy.Expr:
+        """Ensure Big-O expressions have positive leading terms."""
+        expr = sympy.simplify(expr)
+        replacements = {
+            sympy.log(1 / self.n): -sympy.log(self.n),
+            sympy.log(self.n**-1): -sympy.log(self.n)
+        }
+        expr = expr.xreplace(replacements)
+
+        if expr.is_Mul:
+            coeff, rest = expr.as_coeff_Mul()
+            if coeff.is_Number and coeff < 0:
+                expr = -expr
+
+        return sympy.simplify(expr)
+
+    def _fallback_complexity(self, func_name: Optional[str]) -> Optional[str]:
+        if not func_name:
+            return None
+
+        metadata = self.function_metadata.get(func_name, {})
+        relation = (metadata.get('recurrence_relation') or "").replace(" ", "")
+        pattern = metadata.get('pattern_type')
+
+        if pattern == 'binary':
+            return "O(2**n)"
+
+        if pattern == 'binary_exclusive':
+            return "O(log(n))"
+
+        if pattern == 'linear':
+            return "O(n)"
+
+        if pattern == 'divide_conquer':
+            if re.search(r'2T\(n/2\)', relation):
+                if 'O(n)' in relation:
+                    return "O(n*log(n))"
+                return "O(n)"
+            if re.search(r'T\(n/2\)', relation):
+                return "O(log(n))"
+
+        return None
+
+    def _fallback_from_equation(self, eq: sympy.Eq) -> Optional[str]:
+        if not isinstance(eq, sympy.Eq):
+            return None
+
+        rhs = eq.rhs
+        recursive_terms = [
+            subexpr for subexpr in sympy.preorder_traversal(rhs)
+            if isinstance(subexpr, sympy.Function) and subexpr.func == self.T
+        ]
+
+        if not recursive_terms:
+            return None
+
+        decrements = []
+        for term in recursive_terms:
+            arg = term.args[0]
+            diff = sympy.simplify(arg - self.n)
+            if diff.is_Number:
+                decrements.append(diff)
+            else:
+                decrements.append(None)
+
+        if len(recursive_terms) >= 2 and all(d is not None and d < 0 for d in decrements):
+            return "O(2**n)"
+
+        if len(recursive_terms) == 1 and decrements[0] is not None and decrements[0] < 0:
+            return "O(n)"
+
+        return None

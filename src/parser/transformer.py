@@ -68,10 +68,13 @@ class ASTTransformer(Transformer):
     def return_statement(self, return_token, expr):
         return Return(expr)
 
-    def call_statement(self, name, args=None):
+    def call_statement(self, call_token, name, *args):
+        # CALL NAME "(" args? ")" generates: CALL, NAME, and optionally args
         # Handle name properly - it might be a Var object or string
         call_name = name.name if hasattr(name, 'name') else str(name)
-        return Call(call_name, args or [])
+        # args is either empty tuple or tuple with single args list
+        arg_list = args[0] if args else []
+        return Call(call_name, arg_list)
 
     def args(self, *args):
         return list(args)

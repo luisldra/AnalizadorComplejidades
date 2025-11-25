@@ -130,19 +130,20 @@ class RecursiveAlgorithmAnalyzer:
             'pattern_type': 'none'
         }
         
-        # Find recursive calls
+        # Find recursive calls and detect mutually exclusive branches
         recursive_calls = self._find_recursive_calls(function_node)
+        exclusive_calls = self._has_mutually_exclusive_recursive_returns(function_node)
         
         if recursive_calls:
             analysis['has_recursion'] = True
             analysis['recursive_calls'] = recursive_calls
             
             # Analyze the pattern
-            pattern_analysis = self._analyze_call_pattern(recursive_calls)
+            pattern_analysis = self._analyze_call_pattern(recursive_calls, exclusive_calls)
             analysis.update(pattern_analysis)
             
             # Derive recurrence relation
-            relation = self._derive_recurrence_relation(function_node, recursive_calls)
+            relation = self._derive_recurrence_relation(function_node, recursive_calls, exclusive_calls)
             analysis['recurrence_relation'] = relation
             
             # Estimate complexity
@@ -157,6 +158,8 @@ class RecursiveAlgorithmAnalyzer:
                 complexity = self.solver.get_closed_form_solution(pattern)
                 analysis['estimated_complexity'] = complexity
         
+        analysis['exclusive_branch_calls'] = exclusive_calls
+
         # Cache the result
         self.analysis_cache[func_key] = analysis
         return analysis
@@ -246,21 +249,80 @@ class RecursiveAlgorithmAnalyzer:
         traverse(function_node)
         return recursive_calls
     
-    def _analyze_call_pattern(self, recursive_calls: List[Dict[str, Any]]) -> Dict[str, Any]:
-        """Analyze the pattern of recursive calls."""
+    def _analyze_call_pattern(self, recursive_calls: List[Dict[str, Any]], exclusive_branch_calls: bool = False) -> Dict[str, Any]:
+        """Analyze the pattern of recursive calls based on argument structure."""
         
         num_calls = len(recursive_calls)
         
         if num_calls == 0:
             return {'pattern_type': 'none'}
-        elif num_calls == 1:
-            return {'pattern_type': 'linear'}
+        
+        # Analizar estructura de argumentos de las llamadas recursivas
+        has_division = False      # n/2, n/k (división)
+        has_subtraction = False   # n-1, n-2 (resta)
+        has_multiple_subtractions = False  # n-1 Y n-2 (Fibonacci pattern)
+        has_mid_variable = False  # uso explícito de midpoint
+        
+        subtraction_values = []
+        
+        for call_info in recursive_calls:
+            call_node = call_info.get('node')
+            if not call_node or not hasattr(call_node, 'args'):
+                continue
+                
+            for arg in call_node.args:
+                # Detectar división (n/2, n/k)
+                if hasattr(arg, 'op') and arg.op == '/':
+                    has_division = True
+                
+                # Detectar resta (n-1, n-2, etc.)
+                elif hasattr(arg, 'op') and arg.op == '-':
+                    has_subtraction = True
+                    if hasattr(arg, 'right') and hasattr(arg.right, 'value'):
+                        subtraction_values.append(arg.right.value)
+                
+                if self._argument_mentions_midpoint(arg):
+                    has_mid_variable = True
+        
+        # Detectar patrón Fibonacci: múltiples restas con valores diferentes (n-1, n-2)
+        if len(subtraction_values) >= 2:
+            unique_subtractions = len(set(subtraction_values))
+            if unique_subtractions >= 2:
+                has_multiple_subtractions = True
+        
+        # IMPORTANTE: Si hay 2 llamadas pero NO hay operadores en argumentos,
+        # puede ser divide & conquer con variables (como merge_sort que usa middle)
+        no_operators_in_args = not has_division and not has_subtraction
+        
+        # Clasificar patrón basado en estructura de argumentos
+        if num_calls == 1:
+            if has_division:
+                return {'pattern_type': 'divide_conquer'}  # T(n) = T(n/2) + c
+            else:
+                return {'pattern_type': 'linear'}  # T(n) = T(n-1) + c
+        
         elif num_calls == 2:
-            return {'pattern_type': 'binary'}
+            if exclusive_branch_calls:
+                return {'pattern_type': 'binary_exclusive'}
+            if has_multiple_subtractions:
+                # Fibonacci: T(n) = T(n-1) + T(n-2)
+                return {'pattern_type': 'binary'}
+            elif has_division:
+                # Merge Sort: T(n) = 2T(n/2) + n
+                return {'pattern_type': 'divide_conquer'}
+            elif no_operators_in_args or has_mid_variable:
+                # No hay operadores en argumentos - probablemente divide & conquer con variables
+                # (como merge_sort que usa middle = (left + right) / 2)
+                # Asumir divide_conquer para 2 llamadas sin decrementos obvios
+                return {'pattern_type': 'divide_conquer'}
+            else:
+                # Otros casos binarios
+                return {'pattern_type': 'binary'}
+        
         else:
             return {'pattern_type': 'multiple', 'call_count': num_calls}
     
-    def _derive_recurrence_relation(self, function_node: Function, recursive_calls: List[Dict[str, Any]]) -> Optional[str]:
+    def _derive_recurrence_relation(self, function_node: Function, recursive_calls: List[Dict[str, Any]], exclusive_branch_calls: bool) -> Optional[str]:
         """Derive recurrence relation from function structure."""
         
         if not recursive_calls:
@@ -268,15 +330,118 @@ class RecursiveAlgorithmAnalyzer:
         
         num_calls = len(recursive_calls)
         
-        # Simple heuristics based on call patterns
-        if num_calls == 1:
+        # Usar pattern analysis mejorado
+        pattern_info = self._analyze_call_pattern(recursive_calls, exclusive_branch_calls)
+        pattern_type = pattern_info.get('pattern_type', 'none')
+        
+        # Generar relación basada en el patrón detectado
+        if pattern_type == 'linear':
             return "T(n) = T(n-1) + O(1)"
-        elif num_calls == 2:
-            # Could be divide & conquer or binary recursion
-            # Simple heuristic: assume binary recursion for now
+        elif pattern_type == 'binary':
+            # Fibonacci pattern
             return "T(n) = T(n-1) + T(n-2) + O(1)"
+        elif pattern_type == 'binary_exclusive':
+            return "T(n) = T(n/2) + O(1)"
+        elif pattern_type == 'divide_conquer':
+            # Divide & Conquer pattern
+            if num_calls == 1:
+                return "T(n) = T(n/2) + O(1)"
+            elif num_calls == 2:
+                return "T(n) = 2T(n/2) + O(n)"
+            else:
+                return f"T(n) = {num_calls}T(n/{num_calls}) + O(n)"
+        elif pattern_type == 'multiple':
+            call_count = pattern_info.get('call_count', num_calls)
+            return f"T(n) = {call_count}T(n-1) + O(1)"
         else:
-            return f"T(n) = {num_calls}T(n-1) + O(1)"
+            # Fallback genérico
+            if num_calls == 1:
+                return "T(n) = T(n-1) + O(1)"
+            else:
+                return f"T(n) = {num_calls}T(n-1) + O(1)"
+
+    def _has_mutually_exclusive_recursive_returns(self, function_node: Function) -> bool:
+        """Detects IF structures where each branch returns a recursive call."""
+        if not hasattr(function_node, 'body') or not function_node.body:
+            return False
+
+        def traverse(node) -> bool:
+            if isinstance(node, If):
+                then_has = self._branch_has_recursive_return(node.then_body, function_node.name)
+                else_has = self._branch_has_recursive_return(node.else_body, function_node.name)
+                if then_has and else_has:
+                    return True
+                # Continue searching nested conditionals
+                nested_then = node.then_body if isinstance(node.then_body, list) else ([node.then_body] if node.then_body else [])
+                nested_else = node.else_body if isinstance(node.else_body, list) else ([node.else_body] if node.else_body else [])
+                for branch in nested_then:
+                    if traverse(branch):
+                        return True
+                for branch in nested_else:
+                    if traverse(branch):
+                        return True
+            elif isinstance(node, list):
+                for stmt in node:
+                    if traverse(stmt):
+                        return True
+            elif hasattr(node, 'body'):
+                for stmt in node.body:
+                    if traverse(stmt):
+                        return True
+            return False
+
+        for stmt in function_node.body:
+            if traverse(stmt):
+                return True
+        return False
+
+    def _branch_has_recursive_return(self, block, func_name: str) -> bool:
+        if not block:
+            return False
+        nodes = block if isinstance(block, list) else [block]
+        for node in nodes:
+            if self._node_contains_recursive_return(node, func_name):
+                return True
+        return False
+
+    def _node_contains_recursive_return(self, node, func_name: str) -> bool:
+        if node is None:
+            return False
+
+        if isinstance(node, Return):
+            expr = getattr(node, 'expr', getattr(node, 'value', None))
+            if self._is_recursive_call(expr, func_name):
+                return True
+
+        if isinstance(node, If):
+            return (
+                self._branch_has_recursive_return(node.then_body, func_name) or
+                self._branch_has_recursive_return(node.else_body, func_name)
+            )
+
+        if hasattr(node, 'body') and node.body:
+            for stmt in node.body:
+                if self._node_contains_recursive_return(stmt, func_name):
+                    return True
+
+        if hasattr(node, 'expr') and self._is_recursive_call(node.expr, func_name):
+            return True
+
+        return False
+
+    def _is_recursive_call(self, expr, func_name: str) -> bool:
+        if not isinstance(expr, Call):
+            return False
+        call_name = expr.name.name if hasattr(expr.name, 'name') else expr.name
+        return call_name == func_name
+
+    def _argument_mentions_midpoint(self, arg) -> bool:
+        """Detects whether an argument references a midpoint helper variable."""
+        if isinstance(arg, Var):
+            return 'mid' in arg.name.lower()
+        if isinstance(arg, BinOp):
+            return self._argument_mentions_midpoint(arg.left) or self._argument_mentions_midpoint(arg.right)
+        return False
     
     def _generate_function_key(self, function_node: Function) -> str:
         """Generate a unique key for function caching."""

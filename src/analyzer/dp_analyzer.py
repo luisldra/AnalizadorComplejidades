@@ -19,7 +19,7 @@ import json
 from src.ast.nodes import *
 from src.analyzer.advanced_complexity import ComplexityResult, AdvancedComplexityAnalyzer
 from src.analyzer.recurrence_models import RecurrencePattern, RecurrenceTree
-from src.analyzer.recurrence_tree_builder import RecurrenceTreeBuilder
+from src.analyzer.recurrence_tree_builder import TreeStructure
 from src.analyzer.recurrence_visualizer import RecurrenceTreeVisualizer
 from src.analyzer.recurrence_solver import RecurrenceSolver, RecursiveAlgorithmAnalyzer
 
@@ -46,7 +46,7 @@ class DynamicProgrammingAnalyzer:
         self.pattern_cache: Dict[str, RecurrencePattern] = {}
         
         # Specialized Components (Dependency Injection)
-        self.tree_builder = RecurrenceTreeBuilder()
+        self.tree_builder = TreeStructure()
         self.visualizer = RecurrenceTreeVisualizer()
         self.solver = RecurrenceSolver()
         self.recursive_analyzer = RecursiveAlgorithmAnalyzer()

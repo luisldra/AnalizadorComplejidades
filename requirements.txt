@@ -5,3 +5,6 @@ graphviz         # Visualización de grafos
 pytest           # Testing
 fastapi          # API REST (opcional, si quieres exponer servicio)
 uvicorn          # Servidor ASGI para FastAPI
+matplotlib       # Gráficos y visualizaciones científicas
+pillow           # Manipulación de imágenes (PNG)
+pydot            # Interface Python para Graphviz

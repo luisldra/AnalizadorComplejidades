@@ -53,10 +53,27 @@ class RecurrenceTreeNode:
     level: int         # Level in the tree (0 = root)
     children: List['RecurrenceTreeNode'] = None
     cost_at_level: str = ""  # Cost contribution at this level
+    node_id: int = 0   # Unique identifier for hashing
+    
+    _id_counter = 0  # Class variable for generating unique IDs
     
     def __post_init__(self):
         if self.children is None:
             self.children = []
+        # Generate unique ID if not set
+        if self.node_id == 0:
+            RecurrenceTreeNode._id_counter += 1
+            object.__setattr__(self, 'node_id', RecurrenceTreeNode._id_counter)
+    
+    def __hash__(self):
+        """Make node hashable using its unique ID."""
+        return hash(self.node_id)
+    
+    def __eq__(self, other):
+        """Check equality based on node ID."""
+        if not isinstance(other, RecurrenceTreeNode):
+            return False
+        return self.node_id == other.node_id
     
     def add_child(self, child: 'RecurrenceTreeNode'):
         """Add a child node."""

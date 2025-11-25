@@ -83,6 +83,8 @@ class AdvancedComplexityAnalyzer:
         
     def analyze(self, node) -> ComplexityResult:
         """Main entry point for complexity analysis."""
+        # First, detect recursive functions
+        self._detect_recursive_functions(node)
         return self._analyze_node(node)
     
     def _analyze_node(self, node) -> ComplexityResult:
@@ -107,10 +109,15 @@ class AdvancedComplexityAnalyzer:
         return self._combine_parallel(results)
     
     def _analyze_function(self, node: Function) -> ComplexityResult:
-        """Analyze function body - combines all statements sequentially."""
+        """Analyze function body - handles recursive functions specially."""
         if not node.body:
             return ComplexityResult("1", "1")
         
+        # Check if this is a recursive function
+        if node.name and node.name in self.recursive_calls:
+            return self._analyze_recursive_function(node)
+        
+        # Non-recursive function - combine statements sequentially
         results = [self._analyze_node(stmt) for stmt in node.body]
         return self._combine_sequential(results)
     
@@ -379,14 +386,115 @@ class AdvancedComplexityAnalyzer:
         return sorted(complexities, key=complexity_weight)
     
     def _analyze_recursion(self, node: Call) -> ComplexityResult:
-        """Analyze recursive function calls."""
-        # This is a simplified recursion analysis
-        # More sophisticated analysis would solve recurrence relations
+        """Analyze recursive function calls based on detected pattern."""
+        if node.name not in self.recursive_calls:
+            return ComplexityResult("1", "1")
         
-        # For now, assume common recursive patterns:
-        # - Linear recursion (like factorial): O(n)
-        # - Binary recursion (like fibonacci): O(2^n)
-        # - Divide-and-conquer (like mergesort): O(n log n)
+        pattern_info = self.recursive_calls[node.name]
+        pattern = pattern_info['pattern']
         
-        # This would need to be extended based on specific recursion patterns
-        return ComplexityResult("n", "n")  # Conservative estimate
+        if pattern == 'linear':
+            # Linear recursion: T(n) = T(n-1) + O(1) -> O(n)
+            return ComplexityResult("n", "n")
+        elif pattern == 'binary':
+            # Binary recursion: T(n) = T(n-1) + T(n-2) + O(1) -> O(2^n)
+            return ComplexityResult("2^n", "2^n")
+        elif pattern == 'multiple':
+            # Multiple recursive calls - exponential growth
+            num_calls = pattern_info['count']
+            return ComplexityResult(f"{num_calls}^n", f"{num_calls}^n")
+        else:
+            # Conservative estimate for unknown patterns
+            return ComplexityResult("n", "n")
+    
+    def _analyze_recursive_function(self, node: Function) -> ComplexityResult:
+        """
+        Analyze a recursive function by determining its recurrence relation.
+        """
+        if node.name not in self.recursive_calls:
+            return ComplexityResult("1", "1")
+        
+        pattern_info = self.recursive_calls[node.name]
+        pattern = pattern_info['pattern']
+        
+        if pattern == 'linear':
+            # Linear recursion: T(n) = T(n-1) + O(1) -> O(n)
+            return ComplexityResult("n", "n")
+        elif pattern == 'binary':
+            # Binary recursion like Fibonacci: T(n) = T(n-1) + T(n-2) + O(1) -> O(2^n)
+            return ComplexityResult("2^n", "2^n")
+        elif pattern == 'multiple':
+            # Multiple recursive calls - exponential growth
+            num_calls = pattern_info['count']
+            return ComplexityResult(f"{num_calls}^n", f"{num_calls}^n")
+        else:
+            # Conservative estimate for unknown patterns
+            return ComplexityResult("n", "n")
+    
+    def _detect_recursive_functions(self, node):
+        """
+        Detect which functions are recursive by scanning for self-calls.
+        Populates the recursive_calls dictionary with function names and their recursion patterns.
+        """
+        if isinstance(node, Program):
+            # Scan all functions in the program
+            for func in node.functions:
+                self._scan_function_for_recursion(func)
+        elif isinstance(node, Function):
+            # Scan single function
+            self._scan_function_for_recursion(node)
+    
+    def _scan_function_for_recursion(self, func: Function):
+        """
+        Scan a function for recursive calls to itself.
+        """
+        if not func or not func.name:
+            return
+            
+        func_name = func.name
+        recursive_calls = []
+        
+        # Recursively scan the function body for calls to itself
+        def scan_node(node):
+            if isinstance(node, Call) and node.name == func_name:
+                recursive_calls.append(node)
+            
+            # Recursively scan ALL attributes that might contain nodes
+            if hasattr(node, '__dict__'):
+                for attr_name, attr_value in node.__dict__.items():
+                    if attr_value is not None:
+                        if isinstance(attr_value, list):
+                            for child in attr_value:
+                                if hasattr(child, '__dict__'):  # Check if it's a node
+                                    scan_node(child)
+                        elif hasattr(attr_value, '__dict__'):  # Check if it's a node
+                            scan_node(attr_value)
+        
+        # Scan the function body
+        if func.body:
+            for stmt in func.body:
+                scan_node(stmt)
+        
+        # If recursive calls found, classify the recursion pattern
+        if recursive_calls:
+            pattern = self._classify_recursion_pattern(func_name, recursive_calls)
+            self.recursive_calls[func_name] = {
+                'calls': recursive_calls,
+                'pattern': pattern,
+                'count': len(recursive_calls)
+            }
+    
+    def _classify_recursion_pattern(self, func_name: str, calls: List[Call]) -> str:
+        """
+        Classify the type of recursion based on the recursive calls found.
+        """
+        num_calls = len(calls)
+        
+        if num_calls == 0:
+            return 'none'
+        elif num_calls == 1:
+            return 'linear'  # T(n) = T(n-1) + O(1) -> O(n)
+        elif num_calls == 2:
+            return 'binary'  # T(n) = T(n-1) + T(n-2) + O(1) -> O(2^n) 
+        else:
+            return 'multiple'  # Multiple recursive calls

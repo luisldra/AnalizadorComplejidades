@@ -32,6 +32,7 @@ from src.analyzer.dp_analyzer import DynamicProgrammingAnalyzer
 from src.analyzer.recurrence_solver import RecursiveAlgorithmAnalyzer
 from src.analyzer.recurrence_tree_builder import RecurrenceTreeBuilder
 from src.analyzer.recurrence_visualizer import RecurrenceTreeVisualizer
+from src.analyzer.asymptotic_analyzer import AsymptoticAnalyzer
 
 
 class AnalizadorCompleto:
@@ -49,6 +50,7 @@ class AnalizadorCompleto:
         self.recursive_analyzer = RecursiveAlgorithmAnalyzer()
         self.tree_builder = RecurrenceTreeBuilder()
         self.tree_visualizer = RecurrenceTreeVisualizer()
+        self.asymptotic_analyzer = AsymptoticAnalyzer()
         
         print("✅ Todos los sistemas cargados correctamente")
     
@@ -89,30 +91,41 @@ class AnalizadorCompleto:
         print("="*60)
     
     def analisis_basico(self, ast) -> Dict[str, Any]:
-        """Realiza análisis básico de complejidad."""
-        print("\n🔍 ANÁLISIS BÁSICO DE COMPLEJIDAD")
+        """Realiza análisis asintótico formal de complejidad."""
+        print("\n🔍 ANÁLISIS DE COMPLEJIDAD")
         print("-" * 50)
         
         try:
-            resultado = self.basic_analyzer.analyze(ast)
+            # Primero detectar si hay recursión
+            recursive_info = None
+            if hasattr(ast, 'functions') and ast.functions:
+                for func in ast.functions:
+                    rec_analysis = self.recursive_analyzer.analyze_recursive_algorithm(func)
+                    if rec_analysis['has_recursion']:
+                        recursive_info = rec_analysis
+                        break
             
-            print(f"📊 Resultados del análisis:")
-            print(f"   • Big O (peor caso):     {resultado.big_o}")
-            print(f"   • Omega (mejor caso):    {resultado.omega}")
-            print(f"   • Theta (caso promedio): {resultado.theta}")
-            descripcion = getattr(resultado, 'description', 'Análisis básico de complejidad')
-            print(f"   • Descripción: {descripcion}")
+            # Realizar análisis asintótico formal
+            recurrence, bound = self.asymptotic_analyzer.analyze(ast, recursive_info)
+            
+            print(f"Ecuación: {recurrence.equation}")
+            if recurrence.base_cases:
+                base_str = ", ".join([f"{k} = {v}" for k, v in recurrence.base_cases.items()])
+                print(f"Casos base: {base_str}")
+            print(f"\nComplejidad: {bound.notation}({bound.complexity})")
             
             return {
-                'tipo': 'basico',
-                'big_o': resultado.big_o,
-                'omega': resultado.omega,
-                'theta': resultado.theta,
-                'descripcion': descripcion
+                'tipo': 'formal',
+                'ecuacion': recurrence.equation,
+                'complejidad': f"{bound.notation}({bound.complexity})",
+                'metodo': recurrence.method_used,
+                'explicacion': bound.explanation
             }
             
         except Exception as e:
-            print(f"❌ Error en análisis básico: {e}")
+            print(f"❌ Error en análisis: {e}")
+            import traceback
+            traceback.print_exc()
             return {}
     
     def analisis_con_dp(self, ast) -> Dict[str, Any]:
@@ -242,11 +255,11 @@ class AnalizadorCompleto:
         print("\n" + "="*60)
         print("🎯 MENÚ PRINCIPAL - ANALIZADOR DE COMPLEJIDADES")
         print("="*60)
-        print("1. 🔍 Análisis básico de complejidad")
+        print("1. 🔍 Análisis de complejidad (notación asintótica formal)")
         print("2. 🧠 Análisis con Dynamic Programming")
         print("3. 🔄 Análisis de algoritmos recursivos")
         print("4. 🌳 Análisis con árboles de recurrencia") 
-        print("5. 📊 Todos los análisis (básico + DP + recursión)")
+        print("5. 📊 Análisis completo (complejidad + árbol)")
         print("6. 📋 Reporte completo integrado")
         print("7. 📝 Cargar nuevo archivo")
         print("8. ❌ Salir")
@@ -269,11 +282,9 @@ class AnalizadorCompleto:
         elif opcion == '4':
             self.analisis_arboles_recurrencia(ast)
         elif opcion == '5':
-            print("\n🚀 EJECUTANDO TODOS LOS ANÁLISIS")
+            print("\n🚀 ANÁLISIS COMPLETO")
             print("="*60)
             self.analisis_basico(ast)
-            self.analisis_con_dp(ast)
-            self.analisis_recursion(ast)
             self.analisis_arboles_recurrencia(ast)
         elif opcion == '6':
             print("\n📋 REPORTE COMPLETO INTEGRADO")
@@ -295,8 +306,8 @@ def main():
     """Función principal del programa."""
     print("🎓 ANALIZADOR DE COMPLEJIDADES DE ALGORITMOS")
     print("=" * 60)
-    print("Universidad - Análisis y Diseño de Algoritmos")
-    print("Proyecto 2025-2")
+    print("Universidad de Caldas- Análisis y Diseño de Algoritmos")
+    print("Proyecto ADA 2025-2")
     print("=" * 60)
     
     # Inicializar el analizador
