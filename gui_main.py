@@ -110,7 +110,7 @@ def main():
         
         # Centrar ventana
         window_width = 1400
-        window_height = 900
+        window_height = 800
         screen_width = root.winfo_screenwidth()
         screen_height = root.winfo_screenheight()
         x = (screen_width - window_width) // 2
@@ -121,7 +121,6 @@ def main():
         app = MainWindow(root)
         
         print("✅ Interfaz gráfica iniciada correctamente")
-        print("📝 Para comenzar:")
         print("   1. Haga clic en '📁 Abrir Archivo' para cargar pseudocódigo")
         print("   2. O escriba directamente en el editor")
         print("   3. Haga clic en '▶️ Analizar' para iniciar el análisis")

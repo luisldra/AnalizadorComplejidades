@@ -1,16 +1,9 @@
 """
-Dynamic Programming Analyzer - Refactored
-=========================================
+Analizador de Programación Dinámica - Refactorizado
+==========================================
 
-This module implements the main Dynamic Programming analyzer following SRP.
-It coordinates between different specialized components for recurrence analysis.
-
-Following SOLID principles:
-- Single Responsibility: Focuses solely on DP-based complexity analysis coordination
-- Open/Closed: Extensible through composition of specialized analyzers
-- Liskov Substitution: Compatible with existing complexity analysis interfaces
-- Interface Segregation: Uses focused interfaces from specialized components
-- Dependency Inversion: Depends on abstractions, not concrete implementations
+Este módulo implementa el analizador de Programación Dinámica principal siguiendo SRP.
+Se coordina entre diferentes componentes especializados para el análisis de recurrencia.
 """
 
 from typing import Dict, List, Optional, Tuple, Any
@@ -26,44 +19,41 @@ from src.analyzer.recurrence_solver import RecurrenceSolver, RecursiveAlgorithmA
 
 class DynamicProgrammingAnalyzer:
     """
-    Main coordinator for Dynamic Programming-based complexity analysis.
+    Coordinador principal para el análisis de complejidad basado en Programación Dinámica.
     
-    Responsibilities:
-    - Coordinate between specialized components
-    - Manage DP cache for analysis results
-    - Provide unified interface for DP analysis
-    - Generate comprehensive reports
-    
-    This class follows SRP by focusing solely on coordination and caching,
-    delegating specialized tasks to dedicated components.
+    Responsabilidades:
+    - Coordinar entre componentes especializados
+    - Gestionar la caché de PD para resultados de análisis
+    - Proporcionar una interfaz unificada para el análisis de PD
+    - Generar informes comprensivos
     """
     
     def __init__(self):
-        # Core DP Cache: Memoization table for analyzed nodes
+        # Caché de PD principal: tabla de memorización para los nodos analizados
         self.analysis_cache: Dict[str, ComplexityResult] = {}
         
-        # Pattern Cache: Store recognized recurrence patterns
+        # Caché de patrones: almacena patrones de recurrencia reconocidos
         self.pattern_cache: Dict[str, RecurrencePattern] = {}
         
-        # Specialized Components (Dependency Injection)
+        # Componentes especializados (Inyección de Dependencias)
         self.tree_builder = TreeStructure()
         self.visualizer = RecurrenceTreeVisualizer()
         self.solver = RecurrenceSolver()
         self.recursive_analyzer = RecursiveAlgorithmAnalyzer()
         self.base_analyzer = AdvancedComplexityAnalyzer()
         
-        # Statistics for DP performance tracking
+        # Estadísticas para el seguimiento del rendimiento de PD
         self.cache_hits = 0
         self.cache_misses = 0
         self.patterns_recognized = 0
         
-        # Initialize pattern database
+        # Inicializar base de datos de patrones
         self._initialize_pattern_database()
     
     def _initialize_pattern_database(self):
-        """Initialize database of common recurrence patterns using DP principles."""
+        """Inicializar base de datos de patrones comunes de recurrencia usando principios de PD."""
         
-        # Classic DP patterns - this is our "DP table" of known solutions
+        # Patrones clásicos de PD - esta es nuestra "tabla de PD" de soluciones conocidas
         patterns = [
             RecurrencePattern(
                 pattern_type="linear_recursion",
@@ -108,90 +98,90 @@ class DynamicProgrammingAnalyzer:
     
     def analyze_with_dp(self, node) -> ComplexityResult:
         """
-        Main analysis method using Dynamic Programming optimization.
-        
-        DP Strategy:
-        1. Check memoization cache first (overlapping subproblems)
-        2. If not cached, perform analysis with pattern recognition
-        3. Store result in cache for future use
-        4. Use optimal substructure to build complex analyses
+        Método principal de análisis mediante optimización de Programación Dinámica (PD).
+
+        Estrategia PD:
+        1. Verificar primero la caché de memorización (subproblemas superpuestos).
+        2. Si no está en caché, realizar análisis con reconocimiento de patrones.
+        3. Almacenar el resultado en caché para uso futuro.
+        4. Utilizar la subestructura óptima para generar análisis complejos.
         """
         
-        # Generate unique key for memoization
+        # Generar clave única para memorización
         node_key = self._generate_node_key(node)
         
-        # Check cache first (DP memoization)
+        # Verificar caché primero (memorización PD)
         if node_key in self.analysis_cache:
             self.cache_hits += 1
             return self.analysis_cache[node_key]
         
         self.cache_misses += 1
         
-        # Check if this is a recursive function for special handling
+        # Compruebe si esta es una función recursiva para un manejo especial
         if isinstance(node, Function):
             recursive_analysis = self.recursive_analyzer.analyze_recursive_algorithm(node)
             
             if recursive_analysis['has_recursion']:
-                # Use specialized recursive analysis
+                # Utilice análisis recursivo especializado
                 result = self._analyze_recursive_function(node, recursive_analysis)
             else:
-                # Use standard analysis
+                # Utilice análisis estándar
                 result = self.base_analyzer.analyze(node)
         else:
-            # Standard analysis for non-function nodes
+            # Análisis estándar para nodos que no son funciones
             result = self.base_analyzer.analyze(node)
         
-        # Store in cache (DP memoization)
+        # Almacenar en caché (memorización PD)
         self.analysis_cache[node_key] = result
         return result
     
     def analyze_with_recurrence_tree(self, node, max_levels: int = 4) -> Tuple[ComplexityResult, Optional[RecurrenceTree]]:
         """
-        Analyze complexity using both DP cache and recurrence tree visualization.
+        Analiza la complejidad utilizando tanto la caché de PD como la visualización del árbol de recurrencia.
         
         Returns:
-            Tuple of (complexity_result, recurrence_tree)
+            Tupla de (complexity_result, recurrence_tree)
         """
         
-        # Get standard DP analysis
+        # Obtener análisis estándar de PD
         complexity_result = self.analyze_with_dp(node)
         
-        # Try to build recurrence tree if this is a recursive function
+        # Intentar construir el árbol de recurrencia si esta es una función recursiva
         if isinstance(node, Function):
             recursive_analysis = self.recursive_analyzer.analyze_recursive_algorithm(node)
             
             if recursive_analysis['has_recursion'] and recursive_analysis['recurrence_relation']:
-                # Build the recurrence tree
+                # Construir el árbol de recurrencia
                 recurrence_tree = self.tree_builder.build_tree(
                     recursive_analysis['recurrence_relation'], 
                     max_levels
                 )
                 
-                # Update complexity result with tree information if more accurate
+                # Actualizar resultado de complejidad con información del árbol si es más preciso
                 tree_complexity = recurrence_tree.get_total_work()
                 if tree_complexity and tree_complexity != "O(1)":
-                    # Use tree-derived complexity if it's more specific
+                    # Utilice la complejidad derivada del árbol si es más específica
                     complexity_result.big_o = tree_complexity
                 
                 return complexity_result, recurrence_tree
         
-        # Handle Program nodes - find and analyze recursive functions
+        # Manejar nodos de Programa - encontrar y analizar funciones recursivas
         elif isinstance(node, Program) and hasattr(node, 'functions'):
             for function in node.functions:
                 if isinstance(function, Function):
                     recursive_analysis = self.recursive_analyzer.analyze_recursive_algorithm(function)
                     
                     if recursive_analysis['has_recursion'] and recursive_analysis['recurrence_relation']:
-                        # Build the recurrence tree for the first recursive function found
+                        # Construir el árbol de recurrencia para la primera función recursiva encontrada
                         recurrence_tree = self.tree_builder.build_tree(
                             recursive_analysis['recurrence_relation'], 
                             max_levels
                         )
                         
-                        # Update complexity result with tree information if more accurate
+                        # Actualizar resultado de complejidad con información del árbol si es más preciso
                         tree_complexity = recurrence_tree.get_total_work()
                         if tree_complexity and tree_complexity != "O(1)":
-                            # Use tree-derived complexity if it's more specific
+                            # Utilice la complejidad derivada del árbol si es más específica
                             complexity_result.big_o = tree_complexity
                         
                         return complexity_result, recurrence_tree
@@ -199,59 +189,59 @@ class DynamicProgrammingAnalyzer:
         return complexity_result, None
     
     def generate_recurrence_report(self, node) -> str:
-        """Generate comprehensive report including recurrence tree analysis."""
+        """Generar un informe completo que incluya el análisis del árbol de recurrencia."""
         
         complexity_result, recurrence_tree = self.analyze_with_recurrence_tree(node)
         
         report = []
-        report.append("🌳 RECURRENCE TREE ANALYSIS REPORT")
+        report.append("🌳 INFORME DE ANÁLISIS DEL ÁRBOL DE RECURRENCIA")
         report.append("=" * 50)
         
-        report.append(f"\n📊 Complexity Analysis:")
-        report.append(f"   Big O (worst case): {complexity_result.big_o}")
-        report.append(f"   Omega (best case): {complexity_result.omega}")
-        report.append(f"   Theta (tight bound): {complexity_result.theta}")
+        report.append(f"\n📊 Análisis de Complejidad:")
+        report.append(f"   Big O (peor caso): {complexity_result.big_o}")
+        report.append(f"   Omega (mejor caso): {complexity_result.omega}")
+        report.append(f"   Theta (cota ajustada): {complexity_result.theta}")
         
         if recurrence_tree:
-            report.append(f"\n🌳 Recurrence Tree:")
+            report.append(f"\n🌳 Árbol de Recurrencia:")
             report.append(recurrence_tree.get_level_summary())
-            report.append(f"\n📈 Tree Visualization:")
+            report.append(f"\n📈 Visualización del Árbol:")
             report.append(self.visualizer.visualize(recurrence_tree))
         else:
-            report.append(f"\n⚠️  No recurrence pattern detected - likely non-recursive algorithm")
+            report.append(f"\n⚠️  No se detectó un patrón de recurrencia - probablemente un algoritmo no recursivo")
         
-        # Add DP statistics
+        # Agregar estadísticas de DP
         stats = self.get_dp_statistics()
-        report.append(f"\n🧠 DP Cache Statistics:")
-        report.append(f"   Cache hits: {stats['cache_hits']}")
-        report.append(f"   Cache misses: {stats['cache_misses']}")
-        report.append(f"   Hit rate: {stats['hit_rate_percentage']}%")
+        report.append(f"\n🧠 Estadísticas de Caché DP:")
+        report.append(f"   Acertijos de caché: {stats['cache_hits']}")
+        report.append(f"   Fallos de caché: {stats['cache_misses']}")
+        report.append(f"   Tasa de aciertos: {stats['hit_rate_percentage']}%")
         
         return "\n".join(report)
     
     def _analyze_recursive_function(self, function_node: Function, recursive_analysis: Dict) -> ComplexityResult:
-        """Analyze a recursive function with DP optimization."""
+        """Analizar una función recursiva con optimización DP."""
         
-        # Get base analysis
+        # Obtener análisis base
         base_result = self.base_analyzer.analyze_complexity(function_node)
         
-        # Try to improve with recurrence pattern recognition
+        # Intentar mejorar con reconocimiento de patrón de recurrencia
         if recursive_analysis['recurrence_relation']:
             pattern = self._find_matching_pattern(recursive_analysis['recurrence_relation'])
             
             if pattern:
-                # Use pattern-based solution
+                # Usar solución basada en patrón
                 self.patterns_recognized += 1
                 estimated_complexity = self.solver.get_closed_form_solution(pattern)
                 
-                # Update result with better estimation
+                # Actualizar resultado con mejor estimación
                 base_result.big_o = estimated_complexity
                 base_result.theta = estimated_complexity
         
         return base_result
     
     def _find_matching_pattern(self, recurrence_relation: str) -> Optional[RecurrencePattern]:
-        """Find matching pattern in the DP pattern database."""
+        """Buscar patrón coincidente en la base de datos de patrones DP."""
         
         for pattern in self.pattern_cache.values():
             if pattern.matches_formula(recurrence_relation):
@@ -260,31 +250,31 @@ class DynamicProgrammingAnalyzer:
         return None
     
     def _generate_node_key(self, node) -> str:
-        """Generate unique key for node memoization."""
+        """Generar clave única para la memoización del nodo."""
         
-        # Create a hash based on node type and key attributes
+        # Crear un hash basado en el tipo de nodo y atributos clave
         key_data = {
             'type': type(node).__name__,
-            'content': str(node)[:100]  # Limit length
+            'content': str(node)[:100]  # Limitar longitud
         }
         
-        # Add specific attributes based on node type
+        # Agregar atributos específicos según el tipo de nodo
         if hasattr(node, 'name'):
             key_data['name'] = node.name
         
         if hasattr(node, 'body') and node.body:
             key_data['body_length'] = len(node.body)
         
-        # Generate hash
+        # Generar hash
         key_string = json.dumps(key_data, sort_keys=True)
         return hashlib.md5(key_string.encode()).hexdigest()
     
     def _generate_pattern_key(self, formula: str) -> str:
-        """Generate key for pattern caching."""
+        """Generar clave para el almacenamiento en caché de patrones."""
         return hashlib.md5(formula.encode()).hexdigest()
     
     def get_dp_statistics(self) -> Dict[str, Any]:
-        """Get comprehensive DP performance statistics."""
+        """Obtener estadísticas completas de rendimiento de DP."""
         
         total_accesses = self.cache_hits + self.cache_misses
         hit_rate = (self.cache_hits / total_accesses * 100) if total_accesses > 0 else 0
@@ -311,29 +301,29 @@ class DynamicProgrammingAnalyzer:
         self.patterns_recognized = 0
     
     def get_optimization_recommendations(self, node) -> List[str]:
-        """Get recommendations for optimizing the analyzed algorithm."""
+        """Obtener recomendaciones para optimizar el algoritmo analizado."""
         
         recommendations = []
         
-        # Analyze with recurrence tree
+        # Analizar con árbol de recurrencia
         complexity_result, recurrence_tree = self.analyze_with_recurrence_tree(node)
         
-        # Check complexity patterns
+        # Verificar patrones de complejidad
         if "2^n" in complexity_result.big_o:
-            recommendations.append("Exponential complexity detected - consider memoization or DP optimization")
+            recommendations.append("Complejidad exponencial detectada - considerar memoización u optimización DP")
         
         if "n^2" in complexity_result.big_o:
-            recommendations.append("Quadratic complexity - look for nested loop optimizations")
+            recommendations.append("Complejidad cuadrática detectada - buscar optimizaciones en bucles anidados")
         
         if recurrence_tree and recurrence_tree.pattern_type == 'exponential':
-            recommendations.append("Exponential recurrence pattern - ideal candidate for DP memoization")
+            recommendations.append("Patrón de recurrencia exponencial - candidato ideal para memoización DP")
         
-        # Check cache efficiency
+        # Verificar eficiencia de caché
         stats = self.get_dp_statistics()
         if stats['hit_rate_percentage'] < 50:
-            recommendations.append("Low cache hit rate - consider restructuring for better DP optimization")
+            recommendations.append("Baja tasa de aciertos en caché - considerar reestructuración para mejor optimización DP")
         
         if not recommendations:
-            recommendations.append("Algorithm appears well-optimized for current analysis")
+            recommendations.append("El algoritmo parece estar bien optimizado para el análisis actual")
         
         return recommendations

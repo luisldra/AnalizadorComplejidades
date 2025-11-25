@@ -1,12 +1,10 @@
 """
-Advanced Complexity Analyzer
+Analizador de Complejidad Avanzado
 ============================
 
-This module provides comprehensive complexity analysis for pseudocode algorithms,
-supporting Big O (worst case), Omega (best case), and Theta (tight bound) notations.
+Este módulo proporciona un análisis de complejidad completo para algoritmos de pseudocódigo, compatible con las notaciones Big O (peor caso), Omega (mejor caso) y Theta (límite estricto).
 
-The analyzer traverses the AST and applies complexity analysis rules based on
-algorithmic constructs like loops, conditionals, recursion, and data structure operations.
+El analizador recorre el AST y aplica reglas de análisis de complejidad basadas en construcciones algorítmicas como bucles, condicionales, recursión y operaciones con estructuras de datos.
 """
 
 from src.ast.nodes import *
@@ -17,13 +15,13 @@ import re
 
 @dataclass
 class ComplexityResult:
-    """Represents the complexity analysis result with O, Ω, and Θ notations."""
-    big_o: str          # Worst case (upper bound)
-    omega: str          # Best case (lower bound)  
-    theta: Optional[str] = None  # Tight bound (when O = Ω)
+    """Representa el resultado del análisis de complejidad con notaciones O, Ω y Θ."""
+    big_o: str          # Peor caso (cota superior)
+    omega: str          # Mejor caso (cota inferior)  
+    theta: Optional[str] = None  # Cota estricta (cuando O = Ω)
     
     def __post_init__(self):
-        """Calculate Theta if O and Omega are equal."""
+        """Calcular Theta si O y Omega son iguales."""
         if self.big_o == self.omega:
             self.theta = self.big_o
     
@@ -35,24 +33,24 @@ class ComplexityResult:
 
 
 class ComplexityFunction:
-    """Represents a complexity function for mathematical operations."""
+    """Representa una función de complejidad para operaciones matemáticas."""
     
     def __init__(self, expression: str):
         self.expression = expression
         self.degree = self._calculate_degree()
     
     def _calculate_degree(self) -> int:
-        """Calculate the polynomial degree of the complexity function."""
+        """Calcular el grado polinomial de la función de complejidad."""
         if "log" in self.expression:
-            return 0.5  # log n grows slower than linear
+            return 0.5  # log n crece más lento que lineal
         elif "^" in self.expression:
-            # Extract highest power
+            # Extraer la potencia más alta
             powers = re.findall(r'\^(\d+)', self.expression)
             return max(int(p) for p in powers) if powers else 1
         elif "n" in self.expression:
             return 1
         else:
-            return 0  # constant
+            return 0  # constante
     
     def __str__(self):
         return self.expression
@@ -66,15 +64,15 @@ class ComplexityFunction:
 
 class AdvancedComplexityAnalyzer:
     """
-    Advanced complexity analyzer supporting O, Ω, and Θ notations.
-    
-    Analysis Rules:
-    - Constants: O(1), Ω(1), Θ(1)
-    - Simple loops: O(n), Ω(n), Θ(n)  
-    - Nested loops: O(n^k) where k is nesting depth
-    - Conditionals: max(branches) for O, min(branches) for Ω
-    - Arrays/Matrices: depends on access pattern
-    - Recursion: analyzed based on recurrence relations
+    Analizador de complejidad avanzado compatible con las notaciones O, Ω y Θ.
+
+    Reglas de análisis:
+    - Constantes: O(1), Ω(1), Θ(1)
+    - Bucles simples: O(n), Ω(n), Θ(n)
+    - Bucles anidados: O(n^k), donde k es la profundidad de anidación
+    - Condicionales: max(ramas) para O, min(ramas) para Ω
+    - Matrices: depende del patrón de acceso
+    - Recursión: análisis basado en relaciones de recurrencia
     """
     
     def __init__(self):
@@ -82,52 +80,52 @@ class AdvancedComplexityAnalyzer:
         self.recursive_calls = {}
         
     def analyze(self, node) -> ComplexityResult:
-        """Main entry point for complexity analysis."""
-        # First, detect recursive functions
+        """Punto de entrada principal para el análisis de complejidad."""
+        # Primero, detectar funciones recursivas
         self._detect_recursive_functions(node)
         return self._analyze_node(node)
     
     def _analyze_node(self, node) -> ComplexityResult:
-        """Dispatch to appropriate analysis method based on node type."""
+        """Despachar al método de análisis apropiado según el tipo de nodo."""
         method_name = f"_analyze_{type(node).__name__.lower()}"
         if hasattr(self, method_name):
             return getattr(self, method_name)(node)
         else:
-            # Default case for unknown nodes
+            # Caso por defecto para nodos desconocidos
             return ComplexityResult("1", "1")
     
-    # ========== Program Structure Analysis ==========
+    # ========== Análisis de Estructura del Programa ==========
     
     def _analyze_program(self, node: Program) -> ComplexityResult:
-        """Analyze entire program - combines all function complexities."""
+        """Analizar programa completo - combina las complejidades de todas las funciones."""
         if not node.functions:
             return ComplexityResult("1", "1")
         
-        # For programs with multiple functions, we typically analyze the main function
-        # or return the maximum complexity among all functions
+        # Para programas con múltiples funciones, típicamente analizamos la función principal
+        # o retornamos la complejidad máxima entre todas las funciones
         results = [self._analyze_node(func) for func in node.functions]
         return self._combine_parallel(results)
     
     def _analyze_function(self, node: Function) -> ComplexityResult:
-        """Analyze function body - handles recursive functions specially."""
+        """Analizar cuerpo de función - maneja funciones recursivas especialmente."""
         if not node.body:
             return ComplexityResult("1", "1")
         
-        # Check if this is a recursive function
+        # Verificar si esta es una función recursiva
         if node.name and node.name in self.recursive_calls:
             return self._analyze_recursive_function(node)
         
-        # Non-recursive function - combine statements sequentially
+        # Función no recursiva - combinar declaraciones secuencialmente
         results = [self._analyze_node(stmt) for stmt in node.body]
         return self._combine_sequential(results)
     
-    # ========== Statement Analysis ==========
+    # ========== Análisis de Sentencias ==========
     
     def _analyze_assignment(self, node: Assignment) -> ComplexityResult:
-        """Analyze assignment - depends on RHS expression complexity."""
+        """Analizar asignación - depende de la complejidad de la expresión RHS."""
         rhs_complexity = self._analyze_node(node.expr)
         
-        # Check if LHS is array/matrix access (affects complexity)
+        # Verificar si LHS es acceso a arreglo/matriz (afecta la complejidad)
         if isinstance(node.name, (ArrayAccess, MatrixAccess)):
             access_complexity = self._analyze_node(node.name)
             return self._combine_sequential([rhs_complexity, access_complexity])
@@ -135,41 +133,41 @@ class AdvancedComplexityAnalyzer:
         return rhs_complexity
     
     def _analyze_for(self, node: For) -> ComplexityResult:
-        """Analyze for loop - multiplies iteration count by body complexity."""
+        """Analizar bucle for - multiplica el número de iteraciones por la complejidad del cuerpo."""
         self.loop_depth += 1
         
-        # Analyze loop bounds to determine iteration count
+        # Analizar los límites del bucle para determinar el número de iteraciones
         start_complexity = self._analyze_node(node.start)
         end_complexity = self._analyze_node(node.end)
         
-        # Analyze body complexity
+        # Analizar la complejidad del cuerpo
         body_results = [self._analyze_node(stmt) for stmt in node.body]
         body_complexity = self._combine_sequential(body_results)
         
-        # For simple loops (0 to n), the iteration count is O(n)
-        # More complex bounds would require different analysis
+        # Para bucles simples (0 a n), el número de iteraciones es O(n)
+        # Límites más complejos requerirían un análisis diferente
         loop_iterations = ComplexityFunction("n")
         
-        # Multiply loop iterations by body complexity
+        # Multiplicar el número de iteraciones del bucle por la complejidad del cuerpo
         result = self._multiply_complexity(loop_iterations, body_complexity)
         
         self.loop_depth -= 1
         return result
     
     def _analyze_while(self, node: While) -> ComplexityResult:
-        """Analyze while loop - estimates based on condition and body."""
+        """Analizar bucle while - estimaciones basadas en condición y cuerpo."""
         self.loop_depth += 1
         
-        # Analyze condition complexity
+        # Analizar la complejidad de la condición
         condition_complexity = self._analyze_node(node.condition)
         
-        # Analyze body complexity  
+        # Analizar la complejidad del cuerpo
         body_results = [self._analyze_node(stmt) for stmt in node.body]
         body_complexity = self._combine_sequential(body_results)
         
-        # While loops are harder to analyze - we make conservative estimates
-        # Best case: condition false immediately (Ω(1))
-        # Worst case: assume O(n) iterations (could be more depending on algorithm)
+        # Los bucles while son más difíciles de analizar - hacemos estimaciones conservadoras
+        # Mejor caso: condición falsa inmediatamente (Ω(1))
+        # Peor caso: asumir O(n) iteraciones (podría ser más dependiendo del algoritmo)
         worst_case = self._multiply_complexity(ComplexityFunction("n"), body_complexity)
         best_case = ComplexityResult("1", "1")
         
@@ -177,16 +175,16 @@ class AdvancedComplexityAnalyzer:
         return ComplexityResult(worst_case.big_o, best_case.omega)
     
     def _analyze_repeat(self, node: Repeat) -> ComplexityResult:
-        """Analyze repeat-until loop - similar to while but executes at least once."""
+        """Analizar bucle repeat-until - similar a while pero se ejecuta al menos una vez."""
         self.loop_depth += 1
         
         body_results = [self._analyze_node(stmt) for stmt in node.body]
         body_complexity = self._combine_sequential(body_results)
         condition_complexity = self._analyze_node(node.condition)
         
-        # Repeat loops execute at least once
-        # Best case: one iteration
-        # Worst case: assume O(n) iterations
+        # Los bucles repeat se ejecutan al menos una vez
+        # Mejor caso: una iteración
+        # Peor caso: asumir O(n) iteraciones
         worst_case = self._multiply_complexity(ComplexityFunction("n"), body_complexity)
         best_case = body_complexity
         
@@ -194,148 +192,148 @@ class AdvancedComplexityAnalyzer:
         return ComplexityResult(worst_case.big_o, best_case.omega)
     
     def _analyze_if(self, node: If) -> ComplexityResult:
-        """Analyze conditional - worst case takes max branch, best case takes min."""
+        """Analizar condicional - el peor caso toma la rama máxima, el mejor caso toma la mínima."""
         then_result = self._combine_sequential([self._analyze_node(stmt) for stmt in node.then_body])
         
         if node.else_body:
             else_result = self._combine_sequential([self._analyze_node(stmt) for stmt in node.else_body])
-            # Worst case: max of branches, Best case: min of branches
+            # Peor caso: máximo de las ramas, Mejor caso: mínimo de las ramas
             worst_case = self._max_complexity(then_result.big_o, else_result.big_o)
             best_case = self._min_complexity(then_result.omega, else_result.omega)
             return ComplexityResult(worst_case, best_case)
         else:
-            # No else branch - best case is O(1) (condition check only)
+            # No hay rama else - el mejor caso es O(1) (solo la comprobación de la condición)
             return ComplexityResult(then_result.big_o, "1")
     
     def _analyze_return(self, node: Return) -> ComplexityResult:
-        """Analyze return statement - depends on expression complexity."""
+        """Analizar sentencia return - depende de la complejidad de la expresión."""
         return self._analyze_node(node.expr)
     
     def _analyze_call(self, node: Call) -> ComplexityResult:
-        """Analyze function call - depends on called function and arguments."""
-        # Analyze argument complexities
+        """Analizar llamada a función - depende de la función llamada y los argumentos."""
+        # Analizar complejidades de los argumentos
         arg_results = [self._analyze_node(arg) for arg in node.args] if node.args else []
         arg_complexity = self._combine_sequential(arg_results) if arg_results else ComplexityResult("1", "1")
         
-        # For recursive calls, we need special handling
+        # Para llamadas recursivas, necesitamos un manejo especial
         if node.name in self.recursive_calls:
             return self._analyze_recursion(node)
         
-        # For built-in or unknown functions, assume O(1) unless we have specific knowledge
-        # This could be extended with a function complexity database
+        # Para funciones integradas o desconocidas, asumir O(1) a menos que tengamos conocimiento específico
+        # Esto podría extenderse con una base de datos de complejidad de funciones
         return self._combine_sequential([arg_complexity, ComplexityResult("1", "1")])
     
-    # ========== Expression Analysis ==========
+    # ========== Análisis de Expresiones ==========
     
     def _analyze_binop(self, node: BinOp) -> ComplexityResult:
-        """Analyze binary operation - combines operand complexities."""
+        """Analizar operación binaria - combina complejidades de operandos."""
         left_result = self._analyze_node(node.left)
         right_result = self._analyze_node(node.right)
         
-        # Basic arithmetic operations are O(1) once operands are computed
+        # Operaciones aritméticas básicas son O(1) una vez que los operandos se han calculado
         return self._combine_sequential([left_result, right_result, ComplexityResult("1", "1")])
     
     def _analyze_var(self, node: Var) -> ComplexityResult:
-        """Variable access is O(1)."""
+        """Acceso a variable es O(1)."""
         return ComplexityResult("1", "1")
     
     def _analyze_number(self, node: Number) -> ComplexityResult:
-        """Number literals are O(1)."""
+        """Literales numéricos son O(1)."""
         return ComplexityResult("1", "1")
     
     def _analyze_condition(self, node: Condition) -> ComplexityResult:
-        """Analyze condition - combines operand complexities plus comparison."""
+        """Analizar condición - combina complejidades de operandos más comparación."""
         left_result = self._analyze_node(node.left)
         right_result = self._analyze_node(node.right)
         
-        # Comparison operations are O(1) once operands are computed
+        # Operaciones de comparación son O(1) una vez que los operandos se han calculado
         return self._combine_sequential([left_result, right_result, ComplexityResult("1", "1")])
     
-    # ========== Array/Matrix Analysis ==========
+    # ========== Análisis de Arreglos/Matrices ==========
     
     def _analyze_arrayaccess(self, node: ArrayAccess) -> ComplexityResult:
-        """Array access - O(1) for index computation + O(1) for access."""
+        """Acceso a arreglo - O(1) para el cálculo del índice + O(1) para el acceso."""
         index_complexity = self._analyze_node(node.index)
         return self._combine_sequential([index_complexity, ComplexityResult("1", "1")])
     
     def _analyze_matrixaccess(self, node: MatrixAccess) -> ComplexityResult:
-        """Matrix access - O(1) for both indices + O(1) for access."""
+        """Acceso a matriz - O(1) para ambos índices + O(1) para el acceso."""
         row_complexity = self._analyze_node(node.row_index)
         col_complexity = self._analyze_node(node.col_index)
         return self._combine_sequential([row_complexity, col_complexity, ComplexityResult("1", "1")])
     
     def _analyze_arraydeclaration(self, node: ArrayDeclaration) -> ComplexityResult:
-        """Array declaration - depends on size and initialization."""
+        """Declaración de arreglo - depende del tamaño y la inicialización."""
         size_complexity = self._analyze_node(node.size)
-        # Declaration itself might require O(size) for initialization
-        return ComplexityResult("n", "n")  # Assuming initialization to size
+        # La declaración en sí podría requerir O(tamaño) para la inicialización
+        return ComplexityResult("n", "n")  # Asumiendo inicialización al tamaño
     
     def _analyze_matrixdeclaration(self, node: MatrixDeclaration) -> ComplexityResult:
-        """Matrix declaration - O(rows * cols) for initialization."""
+        """Declaración de matriz - O(filas * columnas) para la inicialización."""
         rows_complexity = self._analyze_node(node.rows)
         cols_complexity = self._analyze_node(node.cols)
-        return ComplexityResult("n^2", "n^2")  # Assuming n x n matrix
+        return ComplexityResult("n^2", "n^2")  # Asumiendo matriz n x n
     
-    # ========== Boolean Expression Analysis ==========
+    # ========== Análisis de Expresiones Booleanas ==========
     
     def _analyze_boolop(self, node: BoolOp) -> ComplexityResult:
-        """Analyze boolean operation - considers short-circuit evaluation."""
+        """Analizar operación booleana - considera evaluación de cortocircuito."""
         left_result = self._analyze_node(node.left)
         right_result = self._analyze_node(node.right)
         
         if node.op == 'and':
-            # Short-circuit: best case only evaluates left operand
+            # Cortocircuito: el mejor caso solo evalúa el operando izquierdo
             worst_case = self._combine_sequential([left_result, right_result])
             return ComplexityResult(worst_case.big_o, left_result.omega)
         elif node.op == 'or':
-            # Short-circuit: best case only evaluates left operand  
+            # Cortocircuito: el mejor caso solo evalúa el operando izquierdo  
             worst_case = self._combine_sequential([left_result, right_result])
             return ComplexityResult(worst_case.big_o, left_result.omega)
         
         return self._combine_sequential([left_result, right_result])
     
     def _analyze_unaryop(self, node: UnaryOp) -> ComplexityResult:
-        """Analyze unary operation (like 'not')."""
+        """Analizar operación unaria (como 'not')."""
         operand_result = self._analyze_node(node.operand)
         return self._combine_sequential([operand_result, ComplexityResult("1", "1")])
     
     def _analyze_boolean(self, node: Boolean) -> ComplexityResult:
-        """Boolean literals are O(1)."""
+        """Los literales booleanos son O(1)."""
         return ComplexityResult("1", "1")
     
-    # ========== Helper Methods ==========
+    # ========== Métodos Auxiliares ==========
     
     def _combine_sequential(self, results: List[ComplexityResult]) -> ComplexityResult:
-        """Combine complexities for sequential execution (addition)."""
+        """Combinar complejidades para ejecución secuencial (suma)."""
         if not results:
             return ComplexityResult("1", "1")
         
-        # For sequential execution, we take the maximum complexity
+        # Para ejecución secuencial, tomamos la complejidad máxima
         big_o = self._max_complexity(*[r.big_o for r in results])
         omega = self._max_complexity(*[r.omega for r in results])
         
         return ComplexityResult(big_o, omega)
     
     def _combine_parallel(self, results: List[ComplexityResult]) -> ComplexityResult:
-        """Combine complexities for parallel/alternative execution."""
+        """Combinar complejidades para ejecución paralela/alternativa."""
         if not results:
             return ComplexityResult("1", "1")
         
-        # For alternatives, worst case is max, best case is min
+        # Para alternativas, el peor caso es el máximo, el mejor caso es el mínimo
         big_o = self._max_complexity(*[r.big_o for r in results])
         omega = self._min_complexity(*[r.omega for r in results])
         
         return ComplexityResult(big_o, omega)
     
     def _multiply_complexity(self, factor: ComplexityFunction, complexity: ComplexityResult) -> ComplexityResult:
-        """Multiply complexity by a factor (for loops)."""
+        """Multiplicar complejidad por un factor (para bucles)."""
         big_o = self._multiply_expressions(str(factor), complexity.big_o)
         omega = self._multiply_expressions(str(factor), complexity.omega)
         
         return ComplexityResult(big_o, omega)
     
     def _multiply_expressions(self, factor: str, complexity: str) -> str:
-        """Multiply two complexity expressions."""
+        """Multiplicar dos expresiones de complejidad."""
         if complexity == "1":
             return factor
         if factor == "1":
@@ -348,21 +346,21 @@ class AdvancedComplexityAnalyzer:
                 new_power = int(power.group(1)) + 1
                 return f"n^{new_power}"
         
-        # Default case - might need more sophisticated parsing
+        # Caso por defecto - podría necesitar un análisis más sofisticado
         return f"{factor}*{complexity}"
     
     def _max_complexity(self, *complexities: str) -> str:
-        """Return the maximum (dominant) complexity."""
+        """Devolver la complejidad máxima (dominante)."""
         complexity_order = self._sort_complexities(complexities)
-        return complexity_order[-1]  # Return the largest
+        return complexity_order[-1]  # Devolver la mayor
     
     def _min_complexity(self, *complexities: str) -> str:
-        """Return the minimum complexity."""
+        """Devolver la complejidad mínima."""
         complexity_order = self._sort_complexities(complexities)
-        return complexity_order[0]  # Return the smallest
+        return complexity_order[0]  # Devolver la menor
     
     def _sort_complexities(self, complexities: tuple) -> List[str]:
-        """Sort complexities by growth rate."""
+        """Ordenar complejidades por tasa de crecimiento."""
         complexity_map = {
             "1": 0,
             "log n": 1,
@@ -375,18 +373,18 @@ class AdvancedComplexityAnalyzer:
         }
         
         def complexity_weight(comp: str) -> float:
-            # Handle power expressions
+            # Manejar expresiones de potencia
             if "^" in comp:
                 power_match = re.search(r'n\^(\d+)', comp)
                 if power_match:
                     return 2 + int(power_match.group(1))
             
-            return complexity_map.get(comp, 2)  # Default to linear if unknown
+            return complexity_map.get(comp, 2)  # Por defecto lineal si es desconocido
         
         return sorted(complexities, key=complexity_weight)
     
     def _analyze_recursion(self, node: Call) -> ComplexityResult:
-        """Analyze recursive function calls based on detected pattern."""
+        """Analizar llamadas recursivas basadas en el patrón detectado."""
         if node.name not in self.recursive_calls:
             return ComplexityResult("1", "1")
         
@@ -394,22 +392,22 @@ class AdvancedComplexityAnalyzer:
         pattern = pattern_info['pattern']
         
         if pattern == 'linear':
-            # Linear recursion: T(n) = T(n-1) + O(1) -> O(n)
+            # Recursión lineal: T(n) = T(n-1) + O(1) -> O(n)
             return ComplexityResult("n", "n")
         elif pattern == 'binary':
-            # Binary recursion: T(n) = T(n-1) + T(n-2) + O(1) -> O(2^n)
+            # Recursión binaria: T(n) = T(n-1) + T(n-2) + O(1) -> O(2^n)
             return ComplexityResult("2^n", "2^n")
         elif pattern == 'multiple':
-            # Multiple recursive calls - exponential growth
+            # últiples llamadas recursivas - crecimiento exponencial
             num_calls = pattern_info['count']
             return ComplexityResult(f"{num_calls}^n", f"{num_calls}^n")
         else:
-            # Conservative estimate for unknown patterns
+            # Estimación conservadora para patrones desconocidos
             return ComplexityResult("n", "n")
     
     def _analyze_recursive_function(self, node: Function) -> ComplexityResult:
         """
-        Analyze a recursive function by determining its recurrence relation.
+        Analizar una función recursiva determinando su relación de recurrencia.
         """
         if node.name not in self.recursive_calls:
             return ComplexityResult("1", "1")
@@ -418,35 +416,35 @@ class AdvancedComplexityAnalyzer:
         pattern = pattern_info['pattern']
         
         if pattern == 'linear':
-            # Linear recursion: T(n) = T(n-1) + O(1) -> O(n)
+            # Recursión lineal: T(n) = T(n-1) + O(1) -> O(n)
             return ComplexityResult("n", "n")
         elif pattern == 'binary':
-            # Binary recursion like Fibonacci: T(n) = T(n-1) + T(n-2) + O(1) -> O(2^n)
+            # Recursión binaria como Fibonacci: T(n) = T(n-1) + T(n-2) + O(1) -> O(2^n)
             return ComplexityResult("2^n", "2^n")
         elif pattern == 'multiple':
-            # Multiple recursive calls - exponential growth
+            # Últiples llamadas recursivas - crecimiento exponencial
             num_calls = pattern_info['count']
             return ComplexityResult(f"{num_calls}^n", f"{num_calls}^n")
         else:
-            # Conservative estimate for unknown patterns
+            # Estimación conservadora para patrones desconocidos
             return ComplexityResult("n", "n")
     
     def _detect_recursive_functions(self, node):
         """
-        Detect which functions are recursive by scanning for self-calls.
-        Populates the recursive_calls dictionary with function names and their recursion patterns.
+        Detecta qué funciones son recursivas buscando autollamadas.
+        Rellena el diccionario recursive_calls con los nombres de las funciones y sus patrones de recursión.
         """
         if isinstance(node, Program):
-            # Scan all functions in the program
+            # Escanear todas las funciones en el programa
             for func in node.functions:
                 self._scan_function_for_recursion(func)
         elif isinstance(node, Function):
-            # Scan single function
+            # Escanear una sola función
             self._scan_function_for_recursion(node)
     
     def _scan_function_for_recursion(self, func: Function):
         """
-        Scan a function for recursive calls to itself.
+        Escanea una función en busca de llamadas recursivas a sí misma.
         """
         if not func or not func.name:
             return
@@ -454,28 +452,28 @@ class AdvancedComplexityAnalyzer:
         func_name = func.name
         recursive_calls = []
         
-        # Recursively scan the function body for calls to itself
+        # Escanea recursivamente el cuerpo de la función en busca de llamadas a sí misma
         def scan_node(node):
             if isinstance(node, Call) and node.name == func_name:
                 recursive_calls.append(node)
             
-            # Recursively scan ALL attributes that might contain nodes
+            # Escanea recursivamente TODOS los atributos que podrían contener nodos
             if hasattr(node, '__dict__'):
                 for attr_name, attr_value in node.__dict__.items():
                     if attr_value is not None:
                         if isinstance(attr_value, list):
                             for child in attr_value:
-                                if hasattr(child, '__dict__'):  # Check if it's a node
+                                if hasattr(child, '__dict__'):  # Verifica si es un nodo
                                     scan_node(child)
-                        elif hasattr(attr_value, '__dict__'):  # Check if it's a node
+                        elif hasattr(attr_value, '__dict__'):  # Verifica si es un nodo
                             scan_node(attr_value)
         
-        # Scan the function body
+        # Escanea el cuerpo de la función
         if func.body:
             for stmt in func.body:
                 scan_node(stmt)
         
-        # If recursive calls found, classify the recursion pattern
+        # Si se encuentran llamadas recursivas, clasifica el patrón de recursión
         if recursive_calls:
             pattern = self._classify_recursion_pattern(func_name, recursive_calls)
             self.recursive_calls[func_name] = {
@@ -486,7 +484,7 @@ class AdvancedComplexityAnalyzer:
     
     def _classify_recursion_pattern(self, func_name: str, calls: List[Call]) -> str:
         """
-        Classify the type of recursion based on the recursive calls found.
+        Clasifica el tipo de recursión basado en las llamadas recursivas encontradas.
         """
         num_calls = len(calls)
         
@@ -497,4 +495,4 @@ class AdvancedComplexityAnalyzer:
         elif num_calls == 2:
             return 'binary'  # T(n) = T(n-1) + T(n-2) + O(1) -> O(2^n) 
         else:
-            return 'multiple'  # Multiple recursive calls
+            return 'multiple'  # Múltiples llamadas recursivas

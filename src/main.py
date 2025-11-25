@@ -3,7 +3,7 @@
 ANALIZADOR DE COMPLEJIDADES DE ALGORITMOS
 ==========================================
 
-Sistema completo para análisis de complejidad computacional de algoritmos
+Sistema para análisis de complejidad computacional de algoritmos
 implementados en pseudocódigo. Incluye:
 
 - ✅ Análisis básico de complejidad (O, Ω, Θ)
@@ -11,10 +11,6 @@ implementados en pseudocódigo. Incluye:
 - ✅ Árboles de recurrencia para algoritmos recursivos
 - ✅ Visualización de patrones de recurrencia
 - ✅ Cache inteligente con memoización
-- ✅ Arquitectura SOLID refactorizada
-
-Desarrollado por: Universidad - Análisis y Diseño de Algoritmos
-Proyecto 2025-2
 """
 
 import sys

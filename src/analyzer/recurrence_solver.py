@@ -1,13 +1,12 @@
 """
-Recurrence Solver
+Solucionador de Recurrencia
 ================
 
-This module is responsible for solving recurrence relations using Dynamic Programming.
-Following SRP, this module focuses solely on mathematical solving logic.
+Este módulo se encarga de resolver relaciones de recurrencia mediante Programación Dinámica.
 
-Classes:
-- RecurrenceSolver: Solves recurrence relations using DP techniques
-- RecursiveAlgorithmAnalyzer: Analyzes recursive algorithms for patterns
+Clases:
+- Solucionador de Recurrencia: Resuelve relaciones de recurrencia mediante técnicas de Programación Dinámica.
+- Analizador de Algoritmos Recursivos: Analiza algoritmos recursivos en busca de patrones.
 """
 
 from typing import Dict, List, Optional, Any
@@ -19,25 +18,25 @@ from src.analyzer.advanced_complexity import ComplexityResult
 
 class RecurrenceSolver:
     """
-    Solves recurrence relations using Dynamic Programming techniques.
+    Resuelve relaciones de recurrencia utilizando técnicas de Programación Dinámica.
     
-    Responsibility: Mathematical solving of recurrence relations.
+    Responsabilidad: Resolución matemática de relaciones de recurrencia.
     """
     
     @lru_cache(maxsize=1000)  # DP memoization decorator
     def solve_recurrence(self, formula: str, n: int) -> int:
         """
-        Solve recurrence relation for specific value using DP.
+        Resolver relación de recurrencia para un valor específico usando DP.
         
-        This is a simplified solver that demonstrates DP principles.
-        A full implementation would parse mathematical expressions.
+        Este es un solucionador simplificado que demuestra principios de DP.
+        Una implementación completa analizaría expresiones matemáticas.
         """
         
-        # Base cases (DP foundation)
+        # Casos base (fundamento de DP)
         if n <= 1:
             return 1
         
-        # Pattern-based solutions (DP table lookup)
+        # Soluciones basadas en patrones (tabla DP)
         if "T(n-1)" in formula and "2*T(n-1)" not in formula:
             # Linear recurrence: T(n) = T(n-1) + c
             return n  # O(n) solution
@@ -56,12 +55,12 @@ class RecurrenceSolver:
     
     def get_closed_form_solution(self, pattern: RecurrencePattern) -> str:
         """
-        Get closed-form solution for a recurrence pattern.
+        Obtener la solución en forma cerrada para un patrón de recurrencia.
         
-        This uses DP principles to look up known solutions.
+        Esto utiliza principios de DP para buscar soluciones conocidas.
         """
         
-        # Known solutions database (DP table)
+        # Base de datos de soluciones conocidas (tabla DP)
         known_solutions = {
             "T(n) = T(n-1) + O(1)": "O(n)",
             "T(n) = 2T(n-1) + O(1)": "O(2^n)",
@@ -71,11 +70,11 @@ class RecurrenceSolver:
             "T(n) = T(n/2) + O(1)": "O(log n)"
         }
         
-        # Direct lookup
+        # Búsqueda directa
         if pattern.recurrence_formula in known_solutions:
             return known_solutions[pattern.recurrence_formula]
         
-        # Pattern matching for variations
+        # Coincidencia de patrones para variaciones
         formula = pattern.recurrence_formula.lower()
         
         if "t(n-1)" in formula and "2t(n-1)" not in formula:
@@ -92,9 +91,9 @@ class RecurrenceSolver:
 
 class RecursiveAlgorithmAnalyzer:
     """
-    Analyzes recursive algorithms to identify patterns and derive recurrence relations.
+    Analiza algoritmos recursivos para identificar patrones y derivar relaciones de recurrencia.
     
-    Responsibility: Analysis of recursive algorithm structures.
+    Responsabilidad: Análisis de estructuras de algoritmos recursivos.
     """
     
     def __init__(self):
@@ -103,19 +102,19 @@ class RecursiveAlgorithmAnalyzer:
     
     def analyze_recursive_algorithm(self, function_node: Function) -> Dict[str, Any]:
         """
-        Analyze a recursive function to identify its recurrence pattern.
+        Analiza una función recursiva para identificar su patrón de recurrencia.
         
-        Returns comprehensive analysis including:
-        - Recursive call patterns
-        - Work done per call
-        - Derived recurrence relation
-        - Complexity estimation
+        Devuelve un análisis completo que incluye:
+        - Patrones de llamadas recursivas
+        - Trabajo realizado por llamada
+        - Relación de recurrencia derivada
+        - Estimación de complejidad
         """
         
-        # Generate cache key
+        # Generar clave de caché
         func_key = self._generate_function_key(function_node)
         
-        # Check cache first
+        # Verificar caché primero
         if func_key in self.analysis_cache:
             return self.analysis_cache[func_key]
         
@@ -130,7 +129,7 @@ class RecursiveAlgorithmAnalyzer:
             'pattern_type': 'none'
         }
         
-        # Find recursive calls and detect mutually exclusive branches
+        # Encontrar llamadas recursivas y detectar ramas mutuamente exclusivas
         recursive_calls = self._find_recursive_calls(function_node)
         exclusive_calls = self._has_mutually_exclusive_recursive_returns(function_node)
         
@@ -138,15 +137,15 @@ class RecursiveAlgorithmAnalyzer:
             analysis['has_recursion'] = True
             analysis['recursive_calls'] = recursive_calls
             
-            # Analyze the pattern
+            # Analizar el patrón
             pattern_analysis = self._analyze_call_pattern(recursive_calls, exclusive_calls)
             analysis.update(pattern_analysis)
             
-            # Derive recurrence relation
+            # Derivar la relación de recurrencia
             relation = self._derive_recurrence_relation(function_node, recursive_calls, exclusive_calls)
             analysis['recurrence_relation'] = relation
             
-            # Estimate complexity
+            # Estimar la complejidad
             if relation:
                 pattern = RecurrencePattern(
                     pattern_type=analysis['pattern_type'],
@@ -165,7 +164,7 @@ class RecursiveAlgorithmAnalyzer:
         return analysis
     
     def _find_recursive_calls(self, function_node: Function) -> List[Dict[str, Any]]:
-        """Find all recursive calls in a function."""
+        """Encontrar todas las llamadas recursivas en una función."""
         
         recursive_calls = []
         
@@ -173,7 +172,7 @@ class RecursiveAlgorithmAnalyzer:
             if node is None:
                 return
                 
-            # Check if this is a recursive call
+            # Verificar si esta es una llamada recursiva
             if isinstance(node, Call):
                 call_name = None
                 if hasattr(node.name, 'name'):  # node.name is a Var object
@@ -182,7 +181,7 @@ class RecursiveAlgorithmAnalyzer:
                     call_name = node.name
                 
                 if call_name == function_node.name:
-                    # Found recursive call
+                    # Encontrar llamada recursiva
                     call_info = {
                         'depth': depth,
                         'arguments': len(node.args) if hasattr(node, 'args') and node.args else 0,
@@ -191,23 +190,23 @@ class RecursiveAlgorithmAnalyzer:
                     }
                     recursive_calls.append(call_info)
             
-            # Handle specific node types systematically
+            # Manejar tipos de nodos específicos sistemáticamente
             if isinstance(node, Function):
                 if hasattr(node, 'body') and node.body:
                     for stmt in node.body:
                         traverse(stmt, depth + 1)
             
             elif isinstance(node, If):
-                # Traverse condition
+                # Recorrer condición
                 traverse(node.condition, depth + 1)
-                # Traverse then_body
+                # Recorrer then_body
                 if hasattr(node, 'then_body') and node.then_body:
                     if isinstance(node.then_body, list):
                         for stmt in node.then_body:
                             traverse(stmt, depth + 1)
                     else:
                         traverse(node.then_body, depth + 1)
-                # Traverse else_body
+                # Recorrer else_body
                 if hasattr(node, 'else_body') and node.else_body:
                     if isinstance(node.else_body, list):
                         for stmt in node.else_body:
@@ -237,7 +236,7 @@ class RecursiveAlgorithmAnalyzer:
                 traverse(node.right, depth + 1)
             
             elif isinstance(node, Call):
-                # Already handled above for recursive calls
+                # Ya manejado arriba para llamadas recursivas
                 if hasattr(node, 'args') and node.args:
                     for arg in node.args:
                         traverse(arg, depth + 1)
@@ -250,7 +249,7 @@ class RecursiveAlgorithmAnalyzer:
         return recursive_calls
     
     def _analyze_call_pattern(self, recursive_calls: List[Dict[str, Any]], exclusive_branch_calls: bool = False) -> Dict[str, Any]:
-        """Analyze the pattern of recursive calls based on argument structure."""
+        """Analizar el patrón de llamadas recursivas basado en la estructura de argumentos."""
         
         num_calls = len(recursive_calls)
         
@@ -323,14 +322,14 @@ class RecursiveAlgorithmAnalyzer:
             return {'pattern_type': 'multiple', 'call_count': num_calls}
     
     def _derive_recurrence_relation(self, function_node: Function, recursive_calls: List[Dict[str, Any]], exclusive_branch_calls: bool) -> Optional[str]:
-        """Derive recurrence relation from function structure."""
+        """Derivar la relación de recurrencia a partir de la estructura de la función."""
         
         if not recursive_calls:
             return None
         
         num_calls = len(recursive_calls)
         
-        # Usar pattern analysis mejorado
+        # Usar análisis de patrones mejorado
         pattern_info = self._analyze_call_pattern(recursive_calls, exclusive_branch_calls)
         pattern_type = pattern_info.get('pattern_type', 'none')
         
@@ -361,7 +360,7 @@ class RecursiveAlgorithmAnalyzer:
                 return f"T(n) = {num_calls}T(n-1) + O(1)"
 
     def _has_mutually_exclusive_recursive_returns(self, function_node: Function) -> bool:
-        """Detects IF structures where each branch returns a recursive call."""
+        """Detecta estructuras IF donde cada rama retorna una llamada recursiva."""
         if not hasattr(function_node, 'body') or not function_node.body:
             return False
 
@@ -371,7 +370,7 @@ class RecursiveAlgorithmAnalyzer:
                 else_has = self._branch_has_recursive_return(node.else_body, function_node.name)
                 if then_has and else_has:
                     return True
-                # Continue searching nested conditionals
+                # Continuar buscando condicionales anidados
                 nested_then = node.then_body if isinstance(node.then_body, list) else ([node.then_body] if node.then_body else [])
                 nested_else = node.else_body if isinstance(node.else_body, list) else ([node.else_body] if node.else_body else [])
                 for branch in nested_then:
@@ -436,7 +435,7 @@ class RecursiveAlgorithmAnalyzer:
         return call_name == func_name
 
     def _argument_mentions_midpoint(self, arg) -> bool:
-        """Detects whether an argument references a midpoint helper variable."""
+        """Detecta si un argumento hace referencia a una variable auxiliar de punto medio."""
         if isinstance(arg, Var):
             return 'mid' in arg.name.lower()
         if isinstance(arg, BinOp):
@@ -444,19 +443,19 @@ class RecursiveAlgorithmAnalyzer:
         return False
     
     def _generate_function_key(self, function_node: Function) -> str:
-        """Generate a unique key for function caching."""
+        """Genera una clave única para el almacenamiento en caché de funciones."""
         
-        # Simple key based on function name and body structure
+        # Clave simple basada en el nombre de la función y la estructura del cuerpo
         key_parts = [function_node.name]
         
-        # Add some structure information
+        # Agregar información de estructura
         if hasattr(function_node, 'body'):
             key_parts.append(f"body_{len(function_node.body)}")
         
         return "_".join(key_parts)
     
     def get_analysis_statistics(self) -> Dict[str, Any]:
-        """Get statistics about the analysis performed."""
+        """Obtener estadísticas sobre el análisis realizado."""
         
         total_analyzed = len(self.analysis_cache)
         recursive_functions = sum(1 for analysis in self.analysis_cache.values() 

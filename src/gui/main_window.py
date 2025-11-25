@@ -63,7 +63,6 @@ class MainWindow:
         self.dp_analyzer = DynamicProgrammingAnalyzer()
         self.recursive_analyzer = RecursiveAlgorithmAnalyzer()
         
-        # CORRECCIÓN: Iniciamos el builder vacío
         self.tree_builder = TreeStructure(None) 
         
         self.asymptotic_analyzer = AsymptoticAnalyzer()
@@ -82,7 +81,6 @@ class MainWindow:
         style = ttk.Style()
         style.theme_use('clam')
         
-        # Colores corporativos
         style.configure('Title.TLabel', font=('Arial', 16, 'bold'), foreground='#1976D2')
         style.configure('Header.TLabel', font=('Arial', 12, 'bold'), foreground='#424242')
         style.configure('Info.TLabel', font=('Arial', 10), foreground='#616161')
@@ -168,17 +166,17 @@ class MainWindow:
         
         # Placeholder text - ejemplo válido de factorial
         self.code_editor.insert('1.0', """function factorial(n)
-begin
-    if n <= 1
-    begin
-        return 1
-    end
-    else
-    begin
-        return n * call factorial(n - 1)
-    end
-end
-""")
+            begin
+                if n <= 1
+                begin
+                    return 1
+                end
+                else
+                begin
+                    return n * call factorial(n - 1)
+                end
+            end
+            """)
     
     def _create_analysis_tab(self):
         """Crea la pestaña de análisis - DEPRECATED, usar _create_complete_analysis_tab."""
@@ -386,7 +384,7 @@ end
         
         # --- NEW MATHEMATICAL ANALYSIS ---
         result += "╔" + "═" * 118 + "╗\n"
-        result += "║" + " " * 35 + "ANÁLISIS MATEMÁTICO REAL (NUEVO MOTOR)" + " " * 44 + "║\n"
+        result += "║" + " " * 35 + "ANÁLISIS MATEMÁTICO" + " " * 44 + "║\n"
         result += "╚" + "═" * 118 + "╝\n\n"
         try:
             solved_results = self.math_analyzer.analyze(self.current_ast)
@@ -415,7 +413,7 @@ end
         # --- END NEW ANALYSIS ---
 
         result += "╔" + "═" * 118 + "╗\n"
-        result += "║" + " " * 38 + "ANÁLISIS HEURÍSTICO (MOTOR ANTIGUO)" + " " * 45 + "║\n"
+        result += "║" + " " * 38 + "ANÁLISIS HEURÍSTICO" + " " * 45 + "║\n"
         result += "╚" + "═" * 118 + "╝\n\n"
         
         # 1. ANÁLISIS ASINTÓTICO (OLD ENGINE)
@@ -575,23 +573,20 @@ end
     
     def _determine_bound_type(self, bound, recursive_info):
         """Determina si la cota es ajustada (Θ), superior (O) o inferior (Ω)."""
-        # Por ahora, asumimos que si tenemos información completa, es tight bound
-        # En el futuro, se puede mejorar con análisis más detallado
         if recursive_info and bound.complexity:
-            # Si tenemos recursión bien analizada, probablemente es tight
             return "tight"
         elif bound.complexity and "O(" in str(bound.notation):
             return "upper"
         elif bound.complexity and "Ω(" in str(bound.notation):
             return "lower"
         else:
-            return "tight"  # Por defecto asumimos tight
+            return "tight"  
 
     def _format_eq_for_tree_builder(self, eq: 'sp.Eq') -> str:
         """
-        Converts a sympy recurrence equation into the string format
-        expected by the old RecurrenceTreeBuilder.
-        Example: Eq(T(n), 2*T(n/2) + n) -> "T(n) = 2*T(n/2) + O(n)"
+        Convierte una ecuación de recurrencia sympy al formato de cadena esperado por el antiguo 
+        RecurrenceTreeBuilder.
+        Ejemplo: Eq(T(n), 2*T(n/2) + n) -> "T(n) = 2*T(n/2) + O(n)"
         """
         from sympy import O, Add, oo
         
@@ -629,16 +624,6 @@ end
             rhs_str += f" + {work_str}"
         
         return f"{lhs} = {rhs_str}"
-
-    def _perform_complexity_analysis(self):
-        """DEPRECATED - Realiza el análisis de complejidad."""
-        # Este método ya no se usa, ver _perform_complete_analysis()
-        pass
-    
-    def _perform_case_analysis(self):
-        """DEPRECATED - Realiza el análisis de mejor/peor caso."""
-        # Este método ya no se usa, ver _perform_complete_analysis()
-        pass
     
     def generate_tree(self):
         """Genera el árbol simbólico basado en la ecuación matemática encontrada."""

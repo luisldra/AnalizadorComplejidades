@@ -1,20 +1,16 @@
 """
-Asymptotic Complexity Analyzer - Formal Mathematical Analysis
-=============================================================
+Analizador de Complejidad Asintótica - Análisis Matemático Formal
+==============================================================
 
-This module implements rigorous asymptotic analysis following formal computational
-complexity theory. It determines the tight bound (Theta) when possible, or provides
-separate Big O and Omega bounds when they differ.
+Este módulo implementa un análisis asintótico riguroso siguiendo la teoría de la complejidad computacional formal. Determina la cota estricta (Theta) cuando es posible, o proporciona cotas Big O y Omega independientes cuando difieren.
 
-Mathematical Foundation:
-- Formal recurrence relation construction
-- Master Theorem application
-- Substitution method
-- Recurrence tree analysis
-- Precise asymptotic bound determination
+Fundamentos Matemáticos:
+- Construcción formal de relaciones de recurrencia
+- Aplicación del Teorema Maestro
+- Método de Sustitución
+- Análisis de árboles de recurrencia
+- Determinación precisa de cotas asintóticas
 
-Author: Científico de la Computación
-Date: November 2025
 """
 
 from typing import Dict, Optional, Tuple, List, Any
@@ -23,16 +19,15 @@ import re
 import math
 from src.ast.nodes import *
 
-
 @dataclass
 class RecurrenceEquation:
-    """Represents a formal recurrence equation."""
-    equation: str           # T(n) = aT(n/b) + f(n) or similar
-    a: Optional[int]        # Number of recursive calls
-    b: Optional[int]        # Division factor
-    f_n: str               # Work done per call
-    base_cases: Dict[str, str]  # Base case definitions
-    method_used: str       # Resolution method (Master, Substitution, Tree)
+    """Representa una ecuación de recurrencia formal."""
+    equation: str           # T(n) = aT(n/b) + f(n) o similar
+    a: Optional[int]        # úmero de llamadas recursivas
+    b: Optional[int]        # Factor de división
+    f_n: str               # Trabajo realizado por llamada
+    base_cases: Dict[str, str]  # Definiciones de casos base
+    method_used: str       # Método de resolución (Maestro, Sustitución, Árbol)
     
     def __str__(self):
         return self.equation
@@ -40,11 +35,11 @@ class RecurrenceEquation:
 
 @dataclass
 class AsymptoticBound:
-    """Represents the asymptotic complexity bound."""
-    complexity: str         # The complexity class (e.g., "n^2", "2^n")
-    notation: str          # "Θ" for tight bound, "O" for upper, "Ω" for lower
-    confidence: float      # Confidence level (0.0 to 1.0)
-    explanation: str       # Brief explanation of the bound
+    """Representa la cota de complejidad asintótica."""
+    complexity: str         # La clase de complejidad (por ejemplo, "n^2", "2^n")
+    notation: str          # "Θ" para cota estricta, "O" para cota superior, "Ω" para cota inferior
+    confidence: float      # Nivel de confianza (0.0 a 1.0)
+    explanation: str       # Breve explicación de la cota
     
     def __str__(self):
         return f"{self.notation}({self.complexity})"
@@ -52,13 +47,13 @@ class AsymptoticBound:
 
 class AsymptoticAnalyzer:
     """
-    Performs formal asymptotic analysis of algorithms.
+    Realiza un análisis asintótico formal de algoritmos.
     
-    This analyzer determines:
-    1. The precise recurrence relation
-    2. The appropriate solution method
-    3. The tight bound (Theta) when best and worst case coincide
-    4. Separate bounds when they differ
+    Este analizador determina:
+    1. La relación de recurrencia precisa
+    2. El método de solución apropiado
+    3. La cota estricta (Theta) cuando coinciden el mejor y peor caso
+    4. Cotizaciones separadas cuando difieren
     """
     
     def __init__(self):
@@ -66,57 +61,57 @@ class AsymptoticAnalyzer:
         
     def analyze(self, node, recursive_info: Optional[Dict] = None) -> Tuple[RecurrenceEquation, AsymptoticBound]:
         """
-        Perform complete asymptotic analysis.
+        Realiza un análisis asintótico completo.
         
         Args:
-            node: AST node to analyze
-            recursive_info: Optional recursive analysis from RecursiveAlgorithmAnalyzer
+            node: Nodo AST a analizar
+            recursive_info: Análisis recursivo opcional desde RecursiveAlgorithmAnalyzer
             
         Returns:
-            Tuple of (RecurrenceEquation, AsymptoticBound)
+            Tupla de (RecurrenceEquation, AsymptoticBound)
         """
         
-        # Step 1: Construct formal recurrence equation
+        # Paso 1: Construir la ecuación de recurrencia formal
         recurrence = self._construct_recurrence(node, recursive_info)
         
-        # Step 2: Solve using appropriate method
+        # Paso 2: Resolver usando el método apropiado
         bound = self._solve_recurrence(recurrence)
         
         return recurrence, bound
     
     def _construct_recurrence(self, node, recursive_info: Optional[Dict]) -> RecurrenceEquation:
         """
-        Construct formal recurrence relation.
+        Construir la relación de recurrencia formal.
         
-        For recursive algorithms:
-        - Identify number of recursive calls (a)
-        - Identify problem size reduction (b in T(n/b))
-        - Identify work per level f(n)
-        - Define base cases
+        Para algoritmos recursivos:
+        - Identificar el número de llamadas recursivas (a)
+        - Identificar la reducción del tamaño del problema (b en T(n/b))
+        - Identificar el trabajo por nivel f(n)
+        - Definir casos base
         """
         
         if not recursive_info or not recursive_info.get('has_recursion'):
-            # Non-recursive algorithm
+            # Algoritmo no recursivo
             return self._analyze_iterative(node)
         
-        # Recursive algorithm - construct recurrence
+        # Algoritmo recursivo - construir recurrencia
         num_calls = len(recursive_info.get('recursive_calls', []))
         pattern_type = recursive_info.get('pattern_type', 'linear')
         
-        # Determine recurrence parameters
+        # Determinar parámetros de recurrencia
         if pattern_type == 'linear':
             # T(n) = T(n-1) + c
             return RecurrenceEquation(
                 equation="T(n) = T(n-1) + c",
                 a=1,
-                b=None,  # Decrementation, not division
+                b=None,  # Decremento, no división
                 f_n="c",
                 base_cases={"T(0)": "c", "T(1)": "c"},
                 method_used="Substitution"
             )
             
         elif pattern_type == 'binary':
-            # CRITICAL: "binary" puede significar DOS cosas diferentes:
+            # CRÍTICO: "binary" puede significar DOS cosas diferentes:
             # 1. Fibonacci: T(n) = T(n-1) + T(n-2) - ambas ramas se ejecutan
             # 2. Búsqueda binaria: T(n) = T(n/2) + c - ramas mutuamente exclusivas
             
@@ -182,22 +177,22 @@ class AsymptoticAnalyzer:
                 )
             
         elif pattern_type == 'divide_conquer':
-            # Divide & Conquer: T(n) = aT(n/b) + f(n)
-            # Parse from recursive_info if available
+            # Divide y venceras: T(n) = aT(n/b) + f(n)
+            # Analizar desde recursive_info si está disponible
             relation = recursive_info.get('recurrence_relation', '')
             
-            # Try to extract a and b from relation
+            # Intente extraer a y b de la relación
             match = re.search(r'(\d+)T\(n/(\d+)\)', relation)
             if match:
                 a = int(match.group(1))
                 b = int(match.group(2))
             else:
-                # Default: binary division
+                # Por defecto: división binaria
                 a = num_calls
                 b = 2
             
-            # Determine f(n) - work per level
-            # Check if there are loops or linear work in the function
+            # Determinar f(n) - trabajo por nivel
+            # Verificar si hay bucles o trabajo lineal en la función
             has_loop = False
             if hasattr(node, 'functions') and node.functions:
                 func = node.functions[0]
@@ -218,7 +213,7 @@ class AsymptoticAnalyzer:
             )
         
         else:
-            # Multiple calls - generally exponential
+            # Múltiples llamadas - generalmente exponencial
             return RecurrenceEquation(
                 equation=f"T(n) = {num_calls}T(n-1) + c",
                 a=num_calls,
@@ -229,25 +224,25 @@ class AsymptoticAnalyzer:
             )
     
     def _analyze_iterative(self, node) -> RecurrenceEquation:
-        """Analyze iterative (non-recursive) algorithm."""
+        """Analizar algoritmo iterativo (no recursivo)."""
         
-        # Analyze loop structure
+        # Analizar estructura de bucles
         loop_depth = self._count_loop_depth(node)
         
         if loop_depth == 0:
-            # No loops - constant time
+            # Sin bucles - tiempo constante
             equation = "T(n) = c"
             complexity = "1"
         elif loop_depth == 1:
-            # Single loop - linear time
+            # Un solo bucle - tiempo lineal
             equation = "T(n) = cn"
             complexity = "n"
         elif loop_depth == 2:
-            # Nested loops - quadratic
+            # Bucles anidados - tiempo cuadrático
             equation = "T(n) = cn²"
             complexity = "n^2"
         else:
-            # Multiple nested loops
+            # Múltiples bucles anidados
             equation = f"T(n) = cn^{loop_depth}"
             complexity = f"n^{loop_depth}"
         
@@ -261,22 +256,22 @@ class AsymptoticAnalyzer:
         )
     
     def _count_loop_depth(self, node, current_depth=0) -> int:
-        """Count maximum loop nesting depth."""
+        """Contar la profundidad máxima de anidamiento de bucles."""
         
         max_depth = current_depth
         
         if isinstance(node, (For, While, Repeat)):
-            # This is a loop - increment depth
+            # Esto es un bucle - incrementar profundidad
             body_depth = current_depth + 1
             
-            # Check depth in loop body
+            # Verificar profundidad en el cuerpo del bucle
             if hasattr(node, 'body') and node.body:
                 for stmt in node.body:
                     depth = self._count_loop_depth(stmt, body_depth)
                     max_depth = max(max_depth, depth)
         
         elif isinstance(node, (Function, Program)):
-            # Check all statements/functions
+            # Verificar todas las declaraciones/funciones
             items = node.body if hasattr(node, 'body') else node.functions
             if items:
                 for item in items:
@@ -284,7 +279,7 @@ class AsymptoticAnalyzer:
                     max_depth = max(max_depth, depth)
         
         elif isinstance(node, If):
-            # Check both branches
+            # Verificar ambas ramas
             if hasattr(node, 'then_body') and node.then_body:
                 if isinstance(node.then_body, list):
                     for stmt in node.then_body:
@@ -318,7 +313,7 @@ class AsymptoticAnalyzer:
                     if node.expr.op in ['/', '//']:
                         return True
         
-        # Recursively search in children
+        # Búsqueda recursiva en hijos
         if hasattr(node, 'body'):
             body = node.body if isinstance(node.body, list) else [node.body]
             for stmt in body:
@@ -341,12 +336,12 @@ class AsymptoticAnalyzer:
     
     def _solve_recurrence(self, recurrence: RecurrenceEquation) -> AsymptoticBound:
         """
-        Solve recurrence equation using appropriate method.
-        
-        Methods:
-        1. Master Theorem for divide & conquer
-        2. Substitution for linear recursion
-        3. Recurrence tree for complex patterns
+        Resolver la ecuación de recurrencia utilizando el método adecuado.
+
+        Métodos:
+        1. Teorema maestro de "divide y vencerás"
+        2. Sustitución para recursividad lineal
+        3. Árbol de recurrencia para patrones complejos
         """
         
         method = recurrence.method_used
@@ -374,12 +369,12 @@ class AsymptoticAnalyzer:
     
     def _apply_master_theorem(self, rec: RecurrenceEquation) -> AsymptoticBound:
         """
-        Apply Master Theorem for recurrences of form T(n) = aT(n/b) + f(n).
+        Aplicar Teorema Maestro para recurrencias de la forma T(n) = aT(n/b) + f(n).
         
-        Cases:
-        1. If f(n) = O(n^c) where c < log_b(a): T(n) = Θ(n^log_b(a))
-        2. If f(n) = Θ(n^c) where c = log_b(a): T(n) = Θ(n^c log n)
-        3. If f(n) = Ω(n^c) where c > log_b(a): T(n) = Θ(f(n))
+        Casos:
+        1. Si f(n) = O(n^c) donde c < log_b(a): T(n) = Θ(n^log_b(a))
+        2. Si f(n) = Θ(n^c) donde c = log_b(a): T(n) = Θ(n^c log n)
+        3. Si f(n) = Ω(n^c) donde c > log_b(a): T(n) = Θ(f(n))
         """
         
         a = rec.a
@@ -387,12 +382,12 @@ class AsymptoticAnalyzer:
         f_n = rec.f_n
         
         if a is None or b is None:
-            return AsymptoticBound("n", "Θ", 0.7, "Master Theorem not applicable")
+            return AsymptoticBound("n", "Θ", 0.7, "Teorema Maestro no aplicable")
         
-        # Calculate log_b(a)
+        # Calcular log_b(a)
         log_b_a = math.log(a) / math.log(b)
         
-        # Determine c from f(n)
+        # Determinar c a partir de f(n)
         if f_n == "c" or f_n == "1":
             c = 0
         elif f_n == "n":
@@ -400,35 +395,35 @@ class AsymptoticAnalyzer:
         elif f_n == "n^2":
             c = 2
         else:
-            # Try to extract from f_n
+            # Intentar extraer de f_n
             match = re.search(r'n\^(\d+)', f_n)
             c = int(match.group(1)) if match else 1
         
-        # Apply Master Theorem cases
+        # Aplicar casos del Teorema Maestro
         epsilon = 0.01
         
         if c < log_b_a - epsilon:
-            # Case 1: f(n) grows polynomially slower than n^log_b(a)
+            # Caso 1: f(n) crece polinomialmente más lento que n^log_b(a)
             complexity = self._format_complexity(log_b_a)
-            explanation = f"Master Theorem Case 1: f(n) < n^{log_b_a:.2f}"
+            explanation = f"Teorema Maestro Caso 1: f(n) < n^{log_b_a:.2f}"
             
         elif abs(c - log_b_a) < epsilon:
-            # Case 2: f(n) and n^log_b(a) grow at same rate
+            # Caso 2: f(n) y n^log_b(a) crecen a la misma tasa
             if c == 0:
                 complexity = "log n"
             elif c == 1:
                 complexity = "n log n"
             else:
                 complexity = f"n^{int(c)} log n"
-            explanation = f"Master Theorem Case 2: f(n) = Θ(n^{log_b_a:.2f})"
+            explanation = f"Teorema Maestro Caso 2: f(n) = Θ(n^{log_b_a:.2f})"
             
         else:  # c > log_b_a
-            # Case 3: f(n) grows polynomially faster than n^log_b(a)
+            # Caso 3: f(n) crece polinomialmente más rápido que n^log_b(a)
             if c == 1:
                 complexity = "n"
             else:
                 complexity = f"n^{int(c)}"
-            explanation = f"Master Theorem Case 3: f(n) > n^{log_b_a:.2f}"
+            explanation = f"Teorema Maestro Caso 3: f(n) > n^{log_b_a:.2f}"
         
         return AsymptoticBound(
             complexity=complexity,
@@ -439,9 +434,9 @@ class AsymptoticAnalyzer:
     
     def _apply_substitution(self, rec: RecurrenceEquation) -> AsymptoticBound:
         """
-        Apply substitution method for recurrences like T(n) = T(n-1) + c.
+        Aplicar método de sustitución para recurrencias como T(n) = T(n-1) + c.
         
-        For T(n) = T(n-1) + c:
+        Para T(n) = T(n-1) + c:
         T(n) = T(n-1) + c
              = T(n-2) + c + c
              = T(n-3) + 3c
@@ -449,7 +444,7 @@ class AsymptoticAnalyzer:
              = T(0) + nc
              = Θ(n)
         
-        For T(n) = aT(n-1) + c with a > 1:
+        Para T(n) = aT(n-1) + c con a > 1:
         T(n) = aT(n-1) + c
              = a(aT(n-2) + c) + c = a²T(n-2) + ac + c
              = a³T(n-3) + a²c + ac + c
@@ -461,13 +456,13 @@ class AsymptoticAnalyzer:
         a = rec.a if rec.a else 1
         
         if a == 1:
-            # Linear recursion: T(n) = T(n-1) + c → Θ(n)
+            # Recursión lineal: T(n) = T(n-1) + c → Θ(n)
             complexity = "n"
-            explanation = "Substitution: T(n) = T(n-1) + c expands to nc"
+            explanation = "Sustitución: T(n) = T(n-1) + c se expande a nc"
         else:
-            # Exponential: T(n) = aT(n-1) + c → Θ(a^n)
+            # Exponencial: T(n) = aT(n-1) + c → Θ(a^n)
             complexity = f"{a}^n"
-            explanation = f"Substitution: T(n) = {a}T(n-1) + c expands to {a}^n"
+            explanation = f"Sustitución: T(n) = {a}T(n-1) + c se expande a {a}^n"
         
         return AsymptoticBound(
             complexity=complexity,
@@ -478,31 +473,31 @@ class AsymptoticAnalyzer:
     
     def _apply_tree_method(self, rec: RecurrenceEquation) -> AsymptoticBound:
         """
-        Apply recurrence tree method for complex recursions.
-        
-        For Fibonacci-like: T(n) = T(n-1) + T(n-2) + c
-        
-        Tree has exponential nodes, dominated by Fibonacci growth.
-        Number of nodes ≈ φ^n where φ = (1+√5)/2 ≈ 1.618
-        
-        Since φ^n < 2^n, we use Θ(2^n) as tight bound for simplicity.
+        Aplicar el método del árbol de recurrencia para recursiones complejas.
+
+        Para recursiones similares a Fibonacci: T(n) = T(n-1) + T(n-2) + c
+
+        El árbol tiene nodos exponenciales, dominados por el crecimiento de Fibonacci.
+        Número de nodos ≈ φ^n, donde φ = (1+√5)/2 ≈ 1,618
+
+        Como φ^n < 2^n, utilizamos Θ(2^n) como límite estricto para simplificar.
         """
         
         equation = rec.equation
         
         if "T(n-1) + T(n-2)" in equation:
-            # Fibonacci pattern
+            # Patrón Fibonacci
             complexity = "2^n"
-            explanation = "Tree method: Binary branching gives exponential nodes ≈ φ^n ≈ Θ(2^n)"
+            explanation = "Método del árbol: Ramificación binaria da nodos exponenciales ≈ φ^n ≈ Θ(2^n)"
             
         elif rec.a and rec.a > 1:
-            # Multiple branching
+            # Ramificación múltiple
             complexity = f"{rec.a}^n"
-            explanation = f"Tree method: {rec.a}-way branching gives Θ({rec.a}^n)"
+            explanation = f"Método del árbol: Ramificación {rec.a} da Θ({rec.a}^n)"
         else:
             # Default to linear
             complexity = "n"
-            explanation = "Tree method: Linear recursion depth"
+            explanation = "Método del árbol: Profundidad lineal de recursión"
         
         return AsymptoticBound(
             complexity=complexity,
@@ -512,9 +507,9 @@ class AsymptoticAnalyzer:
         )
     
     def _analyze_loops(self, rec: RecurrenceEquation) -> AsymptoticBound:
-        """Analyze iterative algorithms based on loop structure."""
+        """Analizar algoritmos iterativos basados en la estructura de bucles."""
         
-        # Extract complexity from equation
+        # Extraer complejidad de la ecuación
         equation = rec.equation
         
         if "n^" in equation:
@@ -535,14 +530,14 @@ class AsymptoticAnalyzer:
             complexity=complexity,
             notation="Θ",
             confidence=0.95,
-            explanation="Loop analysis: Determined from iteration structure"
+            explanation="Análisis de bucles: Determinado a partir de la estructura de iteración"
         )
     
     def _format_complexity(self, value: float) -> str:
-        """Format floating point complexity to readable form."""
+        """Formatear la complejidad en punto flotante a una forma legible."""
         
         if abs(value - round(value)) < 0.01:
-            # Close to integer
+            # Cercano a entero
             int_val = int(round(value))
             if int_val == 0:
                 return "1"
@@ -551,11 +546,11 @@ class AsymptoticAnalyzer:
             else:
                 return f"n^{int_val}"
         else:
-            # Non-integer exponent
+            # Exponente no entero
             return f"n^{value:.2f}"
     
     def _has_loop(self, node) -> bool:
-        """Check if a node contains any loop structure."""
+        """Verificar si un nodo contiene alguna estructura de bucle."""
         
         if isinstance(node, (For, While, Repeat)):
             return True
@@ -579,9 +574,9 @@ class AsymptoticAnalyzer:
     
     def format_analysis_output(self, recurrence: RecurrenceEquation, bound: AsymptoticBound) -> str:
         """
-        Format the analysis output for display.
+        Formatear la salida del análisis para su visualización.
         
-        Format:
+        Formato:
         Ecuación: T(n) = ...
         Complejidad: Θ(...)
         """

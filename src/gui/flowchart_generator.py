@@ -23,10 +23,6 @@ class FlowchartGenerator:
             'io': '#4DD0E1',         # Cyan
             'loop': '#BA68C8'        # Morado
         }
-
-    # ... (TUS MÉTODOS DE LIMPIEZA DE TEXTO SE MANTIENEN IGUAL, COPIAR DE ARRIBA) ...
-    # Para ahorrar espacio aquí, asumo que usas el método _get_node_text robusto que ya tenías.
-    # Si lo necesitas completo dímelo, pero es el mismo _get_node_text de la respuesta anterior.
     
     def _wrap_text(self, text, width=20):
         if not text or str(text).strip() == "": return ""
@@ -47,9 +43,6 @@ class FlowchartGenerator:
         return None
 
     def _get_node_text(self, node):
-        # ... (PEGA AQUÍ EL MÉTODO _get_node_text DE LA RESPUESTA ANTERIOR) ...
-        # ... (Es vital para que el texto salga limpio) ...
-        # Si no quieres copiar/pegar, avísame y te pongo el archivo entero otra vez.
         if node is None: return "?"
         if isinstance(node, (int, float, str, bool)): return str(node)
         cls_name = type(node).__name__
@@ -130,10 +123,6 @@ class FlowchartGenerator:
         self.graph.add_edge(last_id, end_id)
         
         return self._draw_graph(title)
-
-    # ... (MÉTODOS _process_block, _process_if, _process_loop IGUALES A LA RESPUESTA ANTERIOR) ...
-    # Asegúrate de copiarlos aquí si estás reemplazando el archivo completo.
-    # Por brevedad, asumo que los tienes, son los que crean la estructura lógica del grafo.
     
     def _process_block(self, statements, parent_id):
         current_id = parent_id
@@ -197,7 +186,7 @@ class FlowchartGenerator:
         self.counter += 1
         return node_id
 
-    # --- AQUÍ ESTÁ LA MAGIA DEL ÁRBOL VERTICAL ---
+    # --- ÁRBOL VERTICAL ---
 
     def _hierarchy_pos(self, G, root=None, width=1., vert_gap = 0.2, vert_loc = 0, xcenter = 0.5):
         """

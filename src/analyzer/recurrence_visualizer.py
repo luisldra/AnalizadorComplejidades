@@ -1,12 +1,11 @@
 """
-Recurrence Tree Visualizer
+Visualizador de Árboles de Recurrencia
 =========================
 
-This module is responsible for generating visual representations of recurrence trees.
-Following SRP, this module focuses solely on visualization logic.
+Este módulo se encarga de generar representaciones visuales de árboles de recurrencia.
 
-Classes:
-- RecurrenceTreeVisualizer: Generates ASCII visualizations of recurrence trees
+Clases:
+- Visualizador de Árboles de Recurrencia: Genera visualizaciones ASCII de árboles de recurrencia
 """
 
 from typing import List
@@ -15,51 +14,49 @@ from src.analyzer.recurrence_models import RecurrenceTree, RecurrenceTreeNode
 
 class RecurrenceTreeVisualizer:
     """
-    Generates ASCII visualizations of recurrence trees.
-    
-    Responsibility: Create visual representations of tree structures.
+    Genera visualizaciones ASCII de árboles de recurrencia.
     """
     
     @staticmethod
     def visualize(tree: RecurrenceTree, max_width: int = 80) -> str:
-        """Create ASCII art representation of the recurrence tree."""
+        """Crear una representación en arte ASCII del árbol de recurrencia."""
         
         lines = []
-        lines.append("Recurrence Tree Visualization")
+        lines.append("Visualización del Árbol de Recurrencia")
         lines.append("=" * max_width)
-        lines.append(f"Relation: {tree.recurrence_relation}")
-        lines.append(f"Pattern: {tree.pattern_type}")
-        lines.append(f"Total Complexity: {tree.total_complexity}")
+        lines.append(f"Relación: {tree.recurrence_relation}")
+        lines.append(f"Patrón: {tree.pattern_type}")
+        lines.append(f"Complejidad Total: {tree.total_complexity}")
         lines.append("")
         
-        # Generate tree structure
+        # Generar estructura del árbol
         tree_lines = RecurrenceTreeVisualizer._generate_tree_lines(tree.root, "", True)
         lines.extend(tree_lines)
         
         lines.append("")
-        lines.append("Level-by-Level Analysis:")
+        lines.append("Análisis Nivel por Nivel:")
         lines.append("-" * 30)
         
         for i, cost in enumerate(tree.level_costs):
-            lines.append(f"Level {i}: {cost}")
+            lines.append(f"Nivel {i}: {cost}")
         
         return "\n".join(lines)
     
     @staticmethod
     def _generate_tree_lines(node: RecurrenceTreeNode, prefix: str, is_last: bool) -> List[str]:
-        """Recursively generate tree lines for ASCII visualization."""
+        """Generar recursivamente líneas del árbol para visualización ASCII."""
         
         lines = []
         
-        # Current node
+        # Nodo actual
         connector = "└── " if is_last else "├── "
         node_info = f"T({node.problem_size}) → {node.work_done}"
         lines.append(f"{prefix}{connector}{node_info}")
         
-        # Prepare prefix for children
+        # Preparar prefijo para los hijos
         child_prefix = prefix + ("    " if is_last else "│   ")
         
-        # Add children
+        # Agregar hijos
         for i, child in enumerate(node.children):
             is_last_child = (i == len(node.children) - 1)
             child_lines = RecurrenceTreeVisualizer._generate_tree_lines(child, child_prefix, is_last_child)
@@ -69,12 +66,12 @@ class RecurrenceTreeVisualizer:
     
     @staticmethod
     def generate_compact_view(tree: RecurrenceTree) -> str:
-        """Generate a compact view showing just the structure."""
+        """Generar una vista compacta que muestre solo la estructura."""
         
         lines = []
-        lines.append(f"Tree: {tree.recurrence_relation} → {tree.total_complexity}")
+        lines.append(f"Árbol: {tree.recurrence_relation} → {tree.total_complexity}")
         
-        # Show level structure
+        # Mostrar estructura por niveles
         current_level = [tree.root]
         level = 0
         
@@ -88,7 +85,7 @@ class RecurrenceTreeVisualizer:
             level_info += " + ".join(node_info) + f" = {tree.level_costs[level] if level < len(tree.level_costs) else 'O(?)'}"
             lines.append(level_info)
             
-            # Get next level
+            # Obtener siguiente nivel
             next_level = []
             for node in current_level:
                 next_level.extend(node.children)
@@ -100,39 +97,39 @@ class RecurrenceTreeVisualizer:
     
     @staticmethod
     def generate_summary_report(tree: RecurrenceTree) -> str:
-        """Generate a detailed summary report of the tree."""
+        """Generar un informe detallado del árbol."""
         
         lines = []
-        lines.append("📊 RECURRENCE TREE ANALYSIS REPORT")
+        lines.append("📊 INFORME DE ANÁLISIS DEL ÁRBOL DE RECURRENCIA")
         lines.append("=" * 50)
-        lines.append(f"📝 Recurrence Relation: {tree.recurrence_relation}")
-        lines.append(f"🏷️  Pattern Type: {tree.pattern_type}")
-        lines.append(f"📏 Tree Height: {tree.get_tree_height()} levels")
-        lines.append(f"🎯 Final Complexity: {tree.total_complexity}")
+        lines.append(f"📝 Relación de Recurrencia: {tree.recurrence_relation}")
+        lines.append(f"🏷️  Tipo de Patrón: {tree.pattern_type}")
+        lines.append(f"📏 Altura del Árbol: {tree.get_tree_height()} niveles")
+        lines.append(f"🎯 Complejidad Final: {tree.total_complexity}")
         lines.append("")
         
         # Level breakdown
-        lines.append("📈 Level-by-Level Breakdown:")
+        lines.append("📈 Desglose Nivel por Nivel:")
         lines.append("-" * 30)
         
         for level, cost in enumerate(tree.level_costs):
             node_count = tree._count_nodes_at_level(level)
-            lines.append(f"  Level {level}: {node_count} nodes → {cost}")
+            lines.append(f"  Nivel {level}: {node_count} nodos → {cost}")
         
         lines.append("")
         
         # Complexity calculation details
         complexity, details = tree.calculate_complexity_from_tree()
-        lines.append("🧮 Complexity Calculation:")
-        lines.append(f"  Method: {details['method']}")
-        lines.append(f"  Formula: {details['summation_formula']}")
-        lines.append(f"  Result: {complexity}")
+        lines.append("🧮 Cálculo de Complejidad:")
+        lines.append(f"  Método: {details['method']}")
+        lines.append(f"  Fórmula: {details['summation_formula']}")
+        lines.append(f"  Resultado: {complexity}")
         
         return "\n".join(lines)
     
     @staticmethod
     def generate_simple_tree(tree: RecurrenceTree, max_depth: int = 3) -> str:
-        """Generate a simplified tree view with limited depth."""
+        """Generar una vista simplificada del árbol con profundidad limitada."""
         
         lines = []
         lines.append(f"🌳 {tree.recurrence_relation}")
@@ -155,7 +152,7 @@ class RecurrenceTreeVisualizer:
     @staticmethod
     def _generate_simple_tree_lines(node: RecurrenceTreeNode, prefix: str, is_last: bool, 
                                    current_depth: int, max_depth: int) -> List[str]:
-        """Generate simplified tree lines with depth limit."""
+        """Generar líneas simplificadas del árbol con límite de profundidad."""
         
         if current_depth >= max_depth:
             return []

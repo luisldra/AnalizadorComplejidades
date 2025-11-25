@@ -1,15 +1,13 @@
 """
-Recurrence Analysis Data Models
+Modelos de Datos para el Análisis de Recurrencia
 ==============================
 
-This module contains the data models used for recurrence tree analysis.
-Following SRP (Single Responsibility Principle), this module is solely
-responsible for defining the data structures.
+Este módulo contiene los modelos de datos utilizados para el análisis de árboles de recurrencia.
 
-Classes:
-- RecurrencePattern: Represents a recurrence relation pattern
-- RecurrenceTreeNode: Individual node in a recurrence tree
-- RecurrenceTree: Complete recurrence tree with analysis capabilities
+Clases:
+- RecurrencePattern: Representa un patrón de relación de recurrencia
+- RecurrenceTreeNode: Nodo individual en un árbol de recurrencia
+- RecurrenceTree: Árbol de recurrencia completo con funciones de análisis
 """
 
 from typing import Dict, List, Optional, Tuple, Any
@@ -20,9 +18,9 @@ import re
 @dataclass
 class RecurrencePattern:
     """
-    Represents a recurrence relation pattern for dynamic programming analysis.
+    Representa un patrón de relación de recurrencia para el análisis de programación dinámica.
     
-    Responsibility: Hold pattern data and provide basic pattern operations.
+    Responsabilidad: Mantener datos del patrón y proporcionar operaciones básicas del patrón.
     """
     
     pattern_type: str  # 'linear', 'divide_conquer', 'tree', 'exponential'
@@ -35,17 +33,17 @@ class RecurrencePattern:
         return f"{self.pattern_type}: {self.recurrence_formula} → {self.solution}"
     
     def matches_formula(self, formula: str) -> bool:
-        """Check if a given formula matches this pattern."""
-        # Simple matching - could be enhanced with regex
+        """Verifica si una fórmula dada coincide con este patrón."""
+        # Coincidencia simple - podría mejorarse con expresiones regulares
         return self.recurrence_formula.lower() in formula.lower()
 
 
 @dataclass
 class RecurrenceTreeNode:
     """
-    Represents a node in a recurrence tree for recursive analysis.
+    Representa un nodo en un árbol de recurrencia para el análisis recursivo.
     
-    Responsibility: Hold node data and provide basic node operations.
+    Responsabilidad: Mantener datos del nodo y proporcionar operaciones básicas del nodo.
     """
     
     problem_size: str  # 'n', 'n/2', 'n-1', etc.
@@ -66,34 +64,34 @@ class RecurrenceTreeNode:
             object.__setattr__(self, 'node_id', RecurrenceTreeNode._id_counter)
     
     def __hash__(self):
-        """Make node hashable using its unique ID."""
+        """Hacer que el nodo sea hashable usando su ID único."""
         return hash(self.node_id)
     
     def __eq__(self, other):
-        """Check equality based on node ID."""
+        """Verificar igualdad basada en el ID del nodo."""
         if not isinstance(other, RecurrenceTreeNode):
             return False
         return self.node_id == other.node_id
     
     def add_child(self, child: 'RecurrenceTreeNode'):
-        """Add a child node."""
+        """Agregar un nodo hijo."""
         self.children.append(child)
     
     def get_children_count(self) -> int:
-        """Get the number of direct children."""
+        """Obtener el número de hijos directos."""
         return len(self.children)
     
     def is_leaf(self) -> bool:
-        """Check if this is a leaf node."""
+        """Verificar si este es un nodo hoja."""
         return len(self.children) == 0
 
 
 @dataclass 
 class RecurrenceTree:
     """
-    Complete recurrence tree with analysis capabilities.
+    Árbol de recurrencia completo con capacidades de análisis.
     
-    Responsibility: Hold tree data and provide tree-level operations.
+    Responsabilidad: Mantener datos del árbol y proporcionar operaciones a nivel de árbol.
     """
     
     root: RecurrenceTreeNode
@@ -104,31 +102,31 @@ class RecurrenceTree:
     level_costs: List[str]   # Cost at each level
     
     def get_tree_height(self) -> int:
-        """Calculate the height of the recurrence tree."""
+        """Calcular la altura del árbol de recurrencia."""
         return self.total_levels
     
     def get_total_work(self) -> str:
-        """Calculate total work done across all levels."""
+        """Calcular el trabajo total realizado en todos los niveles."""
         return self.total_complexity
     
     def get_level_summary(self) -> str:
-        """Get a summary of costs at each level."""
-        summary = f"Recurrence Tree Analysis: {self.recurrence_relation}\n"
+        """Obtener un resumen de los costos en cada nivel."""
+        summary = f"Análisis del Árbol de Recurrencia: {self.recurrence_relation}\n"
         summary += "=" * 50 + "\n"
         
         for i, cost in enumerate(self.level_costs):
-            summary += f"Level {i}: {cost}\n"
+            summary += f"Nivel {i}: {cost}\n"
         
         summary += "-" * 50 + "\n"
-        summary += f"Total Complexity: {self.total_complexity}\n"
+        summary += f"Complejidad Total: {self.total_complexity}\n"
         return summary
         
     def calculate_complexity_from_tree(self) -> Tuple[str, Dict[str, Any]]:
         """
-        Calculate total complexity by summing all levels of the recurrence tree.
+        Calcular la complejidad total sumando todos los niveles del árbol de recurrencia.
         
         Returns:
-            Tuple of (total_complexity, calculation_details)
+            Tupla de (complejidad_total, detalles_del_cálculo)
         """
         
         details = {
@@ -139,7 +137,7 @@ class RecurrenceTree:
             'final_result': self.total_complexity
         }
         
-        # Analyze each level's contribution
+        # Analizar la contribución de cada nivel
         total_work_parts = []
         
         for level, cost in enumerate(self.level_costs):
@@ -152,7 +150,7 @@ class RecurrenceTree:
             details['level_contributions'].append(level_info)
             total_work_parts.append(cost)
         
-        # Create summation formula
+        # Crear fórmula de sumatoria
         if self.pattern_type == 'divide_conquer':
             if 'n log n' in self.total_complexity.lower():
                 details['summation_formula'] = 'Σ(level=0 to log n) O(n) = O(n log n)'
@@ -166,11 +164,11 @@ class RecurrenceTree:
         return self.total_complexity, details
     
     def _count_nodes_at_level(self, level: int) -> int:
-        """Count the number of nodes at a specific level."""
+        """Contar el número de nodos en un nivel específico."""
         if level == 0:
             return 1
         
-        # Use BFS to count nodes at specific level
+        # Usar BFS para contar nodos en un nivel específico
         current_level_nodes = [self.root]
         current_level = 0
         
@@ -184,8 +182,8 @@ class RecurrenceTree:
         return len(current_level_nodes)
     
     def _extract_work_per_node(self, cost_description: str) -> str:
-        """Extract the work done per node from cost description."""
-        # Simple parsing - in practice would be more sophisticated
+        """Extraer el trabajo realizado por nodo a partir de la descripción del costo."""
+        # Análisis simple - en la práctica sería más sofisticado
         if 'O(' in cost_description:
             match = re.search(r'O\(([^)]+)\)', cost_description)
             if match:
@@ -193,11 +191,11 @@ class RecurrenceTree:
         return "O(1)"
     
     def visualize_tree(self, max_width: int = 80) -> str:
-        """Generate ASCII visualization of the recurrence tree."""
+        """Generar visualización ASCII del árbol de recurrencia."""
         from src.analyzer.recurrence_visualizer import RecurrenceTreeVisualizer
         return RecurrenceTreeVisualizer.visualize(self, max_width)
     
     def get_compact_summary(self) -> str:
-        """Get a compact summary of the recurrence tree."""
+        """Obtener un resumen compacto del árbol de recurrencia."""
         from src.analyzer.recurrence_visualizer import RecurrenceTreeVisualizer
         return RecurrenceTreeVisualizer.get_compact_view(self)
