@@ -110,7 +110,7 @@ def main():
         
         # Centrar ventana
         window_width = 1400
-        window_height = 800
+        window_height = 750 
         screen_width = root.winfo_screenwidth()
         screen_height = root.winfo_screenheight()
         x = (screen_width - window_width) // 2

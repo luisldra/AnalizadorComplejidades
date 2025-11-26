@@ -89,6 +89,7 @@ args: expr ("," expr)*
 ?term: factor
      | term "*" factor -> mul
      | term "/" factor -> div
+     | term "%" factor -> mod
 
 ?factor: NUMBER
        | NAME

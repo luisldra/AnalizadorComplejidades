@@ -1,0 +1,11 @@
+function busqueda_lineal(arr, n, target)
+begin
+    for i = 0 to n do
+    begin
+        if arr[i] == target
+        begin
+            return i
+        end
+    end
+    return -1
+end

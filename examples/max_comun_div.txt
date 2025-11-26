@@ -1,0 +1,11 @@
+function gcd(a, b)
+begin
+    if b == 0
+    begin
+        return a
+    end
+    else
+    begin
+        return call gcd(b, a % b)
+    end
+end

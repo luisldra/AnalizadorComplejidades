@@ -1,0 +1,9 @@
+function producto_escalar(A, B, n)
+begin
+    producto = 0
+    for i = 0 to n do
+    begin
+        producto = producto + A[i] * B[i]
+    end
+    return producto
+end

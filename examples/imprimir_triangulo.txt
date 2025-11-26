@@ -1,0 +1,12 @@
+function imprimir_triangulo(n)
+begin
+    count = 0
+    for i = 1 to n do
+    begin
+        for j = 1 to i do
+        begin
+            count = count + 1
+        end
+    end
+    return count
+end

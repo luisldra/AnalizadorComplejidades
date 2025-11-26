@@ -1,0 +1,9 @@
+function quick_sort(arr, low, high)
+begin
+    if low < high
+    begin
+        pi = partition_index
+        call quick_sort(arr, low, pi - 1)
+        call quick_sort(arr, pi + 1, high)
+    end
+end

@@ -1,0 +1,16 @@
+function bubble_sort(arr, n)
+begin
+    for i = 0 to n do
+    begin
+        for j = 0 to n - 1 do
+        begin
+            if arr[j] > arr[j+1]
+            begin
+                temp = arr[j]
+                arr[j] = arr[j+1]
+                arr[j+1] = temp
+            end
+        end
+    end
+    return arr
+end
