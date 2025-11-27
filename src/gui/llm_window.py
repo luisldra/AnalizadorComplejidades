@@ -24,6 +24,7 @@ class LLMWindow(tk.Toplevel):
     def _init_service(self):
         try:
             self.gemini = GeminiService()
+            # Actualizar UI de forma segura desde otro hilo
             self.after(0, lambda: self.status_lbl.config(text="✅ Conectado a Gemini AI", foreground="green"))
             self.after(0, lambda: self.btn_generate.config(state=tk.NORMAL))
         except Exception as e:
@@ -82,7 +83,6 @@ class LLMWindow(tk.Toplevel):
 
     def _generate_thread(self, prompt):
         code = self.gemini.generate_algorithm_code(prompt)
-        
         # Actualizar UI en hilo principal
         self.after(0, lambda: self._show_code(code))
 
@@ -93,7 +93,6 @@ class LLMWindow(tk.Toplevel):
         self.btn_generate.config(state=tk.NORMAL, text="✨ Generar Código")
 
     def _audit_code(self):
-        # Obtener código actual (por si el usuario lo editó)
         code = self.txt_code.get('1.0', tk.END).strip()
         if not code or "⏳" in code: return
         
@@ -103,13 +102,8 @@ class LLMWindow(tk.Toplevel):
         threading.Thread(target=self._audit_thread, args=(code,), daemon=True).start()
 
     def _audit_thread(self, code):
-        # 1. Obtener Opinión de la IA
         ai_opinion = self.gemini.get_complexity_opinion(code)
-        
-        # 2. Ejecutar Motor Matemático Real
-        # Usamos el método nuevo del orquestador
         real_result = self.orchestrator.process_code(code, "IA_Snippet")
-        
         self.after(0, lambda: self._show_audit(ai_opinion, real_result))
 
     def _show_audit(self, ai_opinion, real_res):
@@ -118,55 +112,66 @@ class LLMWindow(tk.Toplevel):
         
         if real_res.error:
             t.insert(tk.END, "❌ ERROR DE SINTAXIS:\n", "diverge")
-            t.insert(tk.END, "El código generado por la IA no es válido para nuestro parser.\n")
+            t.insert(tk.END, "El código generado no es válido.\n")
             t.insert(tk.END, f"Detalle: {real_res.error}\n")
             return
 
-        # Renderizar Informe
-        t.insert(tk.END, "RESULTADOS\n", "title")
+        t.insert(tk.END, "RESULTADOS DEL DUELO\n", "title")
         t.insert(tk.END, "="*40 + "\n\n")
         
-        # 1. Opinión IA
         t.insert(tk.END, "🤖 OPINIÓN DE GEMINI:\n", "title")
         t.insert(tk.END, f"{ai_opinion}\n\n")
         
-        # 2. Motor Heurístico
         t.insert(tk.END, "📏 MOTOR HEURÍSTICO:\n", "title")
         
+        # Mostrar notación completa Θ(n)
         display_comp = real_res.heur_complexity 
-        if display_comp == "N/A": display_comp = "Θ(?)" # Fallback
+        if display_comp == "N/A": display_comp = "Θ(?)"
         
         t.insert(tk.END, f"Complejidad: {display_comp}\n") 
         t.insert(tk.END, f"Ecuación: {real_res.heur_equation}\n\n")
 
-        # 3. Motor Matemático
         t.insert(tk.END, "🧮 MOTOR MATEMÁTICO:\n", "title")
         t.insert(tk.END, f"Expresión: {real_res.math_expression}\n")
         t.insert(tk.END, f"Cálculo: {real_res.math_complexity}\n\n")
         
-        # 4. Veredicto
-        t.insert(tk.END, "⚖️ VEREDICTO:\n", "title")
+        # t.insert(tk.END, "⚖️ VEREDICTO:\n", "title")
         
-        # Lógica de comparación:
-        
-        def clean_comp(text):
-            return text.lower().replace("θ", "").replace("o", "").replace("(", "").replace(")", "").strip()
+        # # --- LÓGICA DE COMPARACIÓN ---
+        # def normalize(text):
+        #     # Limpieza extrema para comparación justa
+        #     if not text: return ""
+        #     return text.lower().replace("θ", "").replace("o", "").replace("(", "").replace(")", "").replace(" ", "").strip()
 
-        ai_clean = clean_comp(ai_opinion.split("-")[0]) # Tomamos lo que está antes del guion si hay
-        heur_clean = clean_comp(real_res.heur_notation)
+        # ai_raw = ai_opinion.split("-")[0] # Tomar solo la parte "Θ(n)" antes del guion
         
-        # Búsqueda flexible
-        match = False
-        if heur_clean in ai_clean or ai_clean in heur_clean:
-            match = True
+        # ai_clean = normalize(ai_raw)
+        # motor_clean = normalize(real_res.heur_notation) 
         
-        # Soporte para n vs n^1.00
-        if "n" == heur_clean and "n^1" in ai_clean: match = True
+        # match = False
+        
+        # # 1. Coincidencia exacta
+        # if ai_clean == motor_clean: 
+        #     match = True
+        # # 2. Inclusión (ej: "n" dentro de "linear")
+        # elif motor_clean and motor_clean in ai_clean and len(motor_clean) > 1: 
+        #     match = True
+        # elif ai_clean and ai_clean in motor_clean and len(ai_clean) > 1:
+        #     match = True
+            
+        # # 3. Casos especiales de lenguaje natural
+        # if motor_clean == "n" and ("lineal" in ai_opinion.lower() or "linear" in ai_opinion.lower()):
+        #     match = True
+        # if "2^n" in motor_clean and "exponencial" in ai_opinion.lower():
+        #     match = True
+            
+        # # 4. Regla de oro: Evitar falso positivo de "1" vs "n"
+        # if "1" in motor_clean and "n" in ai_clean: match = False
+        # if "n" in motor_clean and "1" in ai_clean: match = False
 
-        if match:
-             t.insert(tk.END, "✅ CONCORDANCIA DETECTADA\n", "match")
-             t.insert(tk.END, "La IA y el Motor Heurístico coinciden en el orden de complejidad.")
-        else:
-             t.insert(tk.END, "⚠️ DIVERGENCIA DETECTADA\n", "diverge")
-             t.insert(tk.END, f"El sistema detectó {real_res.heur_notation}, pero la IA dice {ai_opinion}.\n")
-             t.insert(tk.END, "Revise la estructura del código generado.")
+        # if match:
+        #      t.insert(tk.END, "✅ CONCORDANCIA DETECTADA\n", "match")
+        #      t.insert(tk.END, "La IA y el Motor Heurístico coinciden.")
+        # else:
+        #      t.insert(tk.END, "⚠️ DIVERGENCIA DETECTADA\n", "diverge")
+        #      t.insert(tk.END, f"Motor: {real_res.heur_complexity} vs IA: {ai_raw}\n")

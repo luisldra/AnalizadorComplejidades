@@ -130,7 +130,7 @@ class RecursiveAlgorithmAnalyzer:
         }
         
         # Encontrar llamadas recursivas y detectar ramas mutuamente exclusivas
-        recursive_calls = self._find_recursive_calls(function_node)
+        recursive_calls = self._find_recursive_calls(function_node, function_node.name)
         exclusive_calls = self._has_mutually_exclusive_recursive_returns(function_node)
         
         if recursive_calls:
@@ -163,88 +163,67 @@ class RecursiveAlgorithmAnalyzer:
         self.analysis_cache[func_key] = analysis
         return analysis
     
-    def _find_recursive_calls(self, function_node: Function) -> List[Dict[str, Any]]:
-        """Encontrar todas las llamadas recursivas en una función."""
-        
+    def _find_recursive_calls(self, function_node, func_name):
         recursive_calls = []
         
         def traverse(node, depth=0):
-            if node is None:
-                return
+            if node is None: return
                 
-            # Verificar si esta es una llamada recursiva
+            # 1. DETECCIÓN DIRECTA (Call)
             if isinstance(node, Call):
                 call_name = None
-                if hasattr(node.name, 'name'):  # node.name is a Var object
-                    call_name = node.name.name
-                elif isinstance(node.name, str):  # node.name is a string
-                    call_name = node.name
+                # Soporte para distintos tipos de nombres en el AST
+                if hasattr(node, 'func_name'):
+                     call_name = node.func_name.name if hasattr(node.func_name, 'name') else node.func_name
+                elif hasattr(node, 'name'):
+                    call_name = node.name.name if hasattr(node.name, 'name') else node.name
                 
-                if call_name == function_node.name:
-                    # Encontrar llamada recursiva
-                    call_info = {
-                        'depth': depth,
-                        'arguments': len(node.args) if hasattr(node, 'args') and node.args else 0,
-                        'location': f"depth_{depth}",
+                if str(call_name) == str(func_name):
+                    recursive_calls.append({
+                        'depth': depth, 
+                        'arguments': len(node.args) if hasattr(node, 'args') else 0,
+                        'location': f"depth_{depth}", 
                         'node': node
-                    }
-                    recursive_calls.append(call_info)
+                    })
             
-            # Manejar tipos de nodos específicos sistemáticamente
-            if isinstance(node, Function):
-                if hasattr(node, 'body') and node.body:
-                    for stmt in node.body:
-                        traverse(stmt, depth + 1)
+            # 2. RECORRIDO (Visitor Pattern)
             
-            elif isinstance(node, If):
-                # Recorrer condición
-                traverse(node.condition, depth + 1)
-                # Recorrer then_body
-                if hasattr(node, 'then_body') and node.then_body:
-                    if isinstance(node.then_body, list):
-                        for stmt in node.then_body:
-                            traverse(stmt, depth + 1)
-                    else:
-                        traverse(node.then_body, depth + 1)
-                # Recorrer else_body
-                if hasattr(node, 'else_body') and node.else_body:
-                    if isinstance(node.else_body, list):
-                        for stmt in node.else_body:
-                            traverse(stmt, depth + 1)
-                    else:
-                        traverse(node.else_body, depth + 1)
+            # Listas
+            if isinstance(node, list):
+                for item in node: traverse(item, depth)
+                
+            # Estructuras con 'body' (Function, While, For)
+            elif hasattr(node, 'body'):
+                traverse(node.body, depth + 1)
+                
+            # Estructuras condicionales
+            if isinstance(node, If):
+                traverse(getattr(node, 'condition', None), depth)
+                traverse(getattr(node, 'then_body', None), depth + 1)
+                traverse(getattr(node, 'else_body', None), depth + 1)
             
-            elif isinstance(node, (While, For, Repeat)):
-                if hasattr(node, 'body') and node.body:
-                    for stmt in node.body:
-                        traverse(stmt, depth + 1)
-                if hasattr(node, 'condition'):
-                    traverse(node.condition, depth + 1)
-            
+            # Retornos (AQUÍ ESTABA EL ERROR PRINCIPAL)
             elif isinstance(node, Return):
-                if hasattr(node, 'expr') and node.expr:
-                    traverse(node.expr, depth + 1)
-                elif hasattr(node, 'value') and node.value:
-                    traverse(node.value, depth + 1)
+                # Tu parser usa 'expr', otros usan 'value'. Buscamos ambos.
+                traverse(getattr(node, 'expr', None), depth)
+                traverse(getattr(node, 'value', None), depth)
             
+            # Asignaciones (ERROR DE LA IA)
             elif isinstance(node, Assignment):
-                if hasattr(node, 'value') and node.value:
-                    traverse(node.value, depth + 1)
+                # Tu parser usa 'expr', otros usan 'value'. Buscamos ambos.
+                traverse(getattr(node, 'expr', None), depth)
+                traverse(getattr(node, 'value', None), depth)
             
+            # Operaciones Binarias
             elif isinstance(node, BinOp):
-                traverse(node.left, depth + 1)
-                traverse(node.right, depth + 1)
-            
+                traverse(node.left, depth)
+                traverse(node.right, depth)
+                
+            # Argumentos de llamadas
             elif isinstance(node, Call):
-                # Ya manejado arriba para llamadas recursivas
-                if hasattr(node, 'args') and node.args:
-                    for arg in node.args:
-                        traverse(arg, depth + 1)
-            
-            elif isinstance(node, list):
-                for item in node:
-                    traverse(item, depth + 1)
-        
+                if hasattr(node, 'args'):
+                    for arg in node.args: traverse(arg, depth)
+
         traverse(function_node)
         return recursive_calls
     
