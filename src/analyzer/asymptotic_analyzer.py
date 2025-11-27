@@ -599,3 +599,32 @@ class AsymptoticAnalyzer:
             lines.append(f"Explicación: {bound.explanation}")
         
         return "\n".join(lines)
+    
+    def analyze_function_node(self, func_node, recursive_info):
+        """
+        Analiza la complejidad asintótica de UNA función específica (nodo AST).
+        Este método es vital para el análisis multi-algoritmo de la nueva interfaz.
+        
+        Args:
+            func_node: El nodo FunctionDef del AST.
+            recursive_info: Diccionario con info de recursión (has_recursion, pattern_type, etc).
+            
+        Returns:
+            Una tupla (recurrence_obj, bound_obj) compatible con la interfaz gráfica.
+        """
+        
+        # 1. Construir la ecuación (Lógica existente)
+        recurrence = self._construct_recurrence(func_node, recursive_info)
+        
+        # 2. Resolver la complejidad (Lógica existente)
+        bound = self._solve_recurrence(recurrence)
+        
+        # --- CORRECCIÓN DE SEGURIDAD (El cambio clave) ---
+        # Si detectamos un patrón lineal recursivo, aseguramos que la complejidad sea "n".
+        # Esto evita que salga solo "Θ" sin la "n" en el reporte.
+        if recursive_info and recursive_info.get('pattern_type') == 'linear':
+             if bound.complexity == "1" or not bound.complexity:
+                 bound.complexity = "n"
+                 bound.notation = "Θ"
+        
+        return recurrence, bound

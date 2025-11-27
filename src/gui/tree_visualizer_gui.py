@@ -9,7 +9,7 @@ class TreeVisualizerGUI(ttk.Frame):
         
         # Estilos
         self.node_radius = 25
-        self.level_height = 70 # Distancia vertical entre niveles
+        self.level_height = 100 # Distancia vertical entre niveles
         self.color_root = "#BBDEFB"
         self.color_node = "#E1F5FE"
         self.color_leaf = "#C8E6C9"
