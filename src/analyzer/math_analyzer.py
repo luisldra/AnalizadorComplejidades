@@ -15,7 +15,8 @@ from src.analyzer.recurrence_solver import RecursiveAlgorithmAnalyzer
 class MathematicalAnalyzer:
     """
     Realiza el análisis de complejidad recorriendo el AST y construyendo una
-    función de costo simbólica.
+    función de costo simbólica. Actúa como “fuente algebraica” del sistema:
+    deduce expresiones/recurrencias y luego las simplifica a Big-O.
     """
     def __init__(self):
         self.n = sympy.Symbol('n', positive=True)
@@ -76,6 +77,13 @@ class MathematicalAnalyzer:
         Teorema Maestro para recurrencias de divide y vencerás.
         """
         try:
+            try:
+                replacements = {f: self.n for f in eq.atoms(sympy.Function) if f.func != self.T}
+                if replacements:
+                    eq = eq.xreplace(replacements)
+            except Exception:
+                pass
+
             # Primero, intente resolver con rsolve para recurrencias lineales
             solution = sympy.rsolve(eq, self.T(self.n))
             if solution:
@@ -329,10 +337,6 @@ class MathematicalAnalyzer:
 
         return {"decrement": decrement, "work": work}
 
-    # ----------------------------------------------------
-    # Cost Visitor (_get_cost)
-    # ----------------------------------------------------
-
     def _expr_has_recurrence(self, expr: Any) -> bool:
         """Ayuda para detectar si una expresión contiene la recurrencia T()."""
         if expr is None:
@@ -479,9 +483,6 @@ class MathematicalAnalyzer:
     def _get_cost_Program(self, node: Program, current_func_name: Optional[str] = None) -> sympy.Expr:
         return self._safe_sum(self._get_cost(func, current_func_name=func.name) for func in node.functions)
 
-    # ----------------------------------------------------
-    # Value Visitor (_get_value)
-    # ----------------------------------------------------
 
     def _get_value(self, node: Node) -> Any:
         """Visitante genérico de valores que despacha a métodos específicos de nodos."""
@@ -516,9 +517,6 @@ class MathematicalAnalyzer:
     def _get_value_Number(self, node: Number) -> sympy.Integer:
         return sympy.Integer(node.value)
 
-    # ----------------------------------------------------
-    # Recurrence normalization helpers
-    # ----------------------------------------------------
 
     def _normalize_recursive_terms(self, expr: Any, func_name: Optional[str]) -> Any:
         if not isinstance(expr, sympy.Eq) or not func_name:
@@ -585,21 +583,44 @@ class MathematicalAnalyzer:
             return inferred_args[0]
         return self.n
 
-    def _normalize_order_expr(self, expr: sympy.Expr) -> sympy.Expr:
-        """Asegurar que las expresiones Big-O tengan términos principales positivos."""
-        expr = sympy.simplify(expr)
-        replacements = {
-            sympy.log(1 / self.n): -sympy.log(self.n),
-            sympy.log(self.n**-1): -sympy.log(self.n)
-        }
-        expr = expr.xreplace(replacements)
+    def _normalize_order_expr(self, expr: Any) -> Any:
+        """
+        Normaliza expresiones antes de calcular Big-O.
+        Cosas que arregla:
+        - O(log(1/n))  -> O(log n)
+        - O(1/log(n))  -> O(1/log n)   (sin cambios en orden, solo forma)
+        - Signos negativos delante de log: -log(n) -> log(n)
+        """
 
-        if expr.is_Mul:
-            coeff, rest = expr.as_coeff_Mul()
-            if coeff.is_Number and coeff < 0:
-                expr = -expr
+        import sympy as sp
 
-        return sympy.simplify(expr)
+        try:
+            n = self.n
+
+            # 1) Expandir un poco la expresión
+            expr = sp.simplify(expr)
+
+            # 2) Reemplazar log(1/n) por -log(n)
+            #    sympy representa log(1/n) literalmente como log(1/n)
+            expr = expr.xreplace({
+                sp.log(1 / n): -sp.log(n)
+            })
+
+            # 3) Si la expresión es -log(n) o -k*log(n) -> |coef|*log(n)
+            if expr.is_Mul:
+                coef, rest = expr.as_coeff_Mul()
+                if coef < 0 and rest.has(sp.log(n)):
+                    expr = abs(coef) * rest
+
+            # 4) Si es directamente -log(n)
+            if expr == -sp.log(n):
+                expr = sp.log(n)
+
+            return expr
+
+        except Exception:
+            # Si algo falla, devolvemos la expresión original
+            return expr
 
     def _fallback_complexity(self, func_name: Optional[str]) -> Optional[str]:
         if not func_name:
@@ -628,32 +649,41 @@ class MathematicalAnalyzer:
 
         return None
 
-    def _fallback_from_equation(self, eq: sympy.Eq) -> Optional[str]:
-        if not isinstance(eq, sympy.Eq):
+    def _fallback_from_equation(self, eq: Any, func_name: str) -> Optional[str]:
+        """
+        Heurísticos por patrón cuando Sympy no puede resolver bien la recurrencia.
+        """
+        import sympy as sp
+        
+        try:
+            if not isinstance(eq, sp.Eq):
+                return None
+
+            lhs, rhs = eq.lhs, eq.rhs
+
+            # Asegurarnos de que es T(n) = ...
+            if lhs.func != self.T:
+                return None
+
+            # Caso 1: T(n) = T(n - k) + c  -> O(n)
+            # (recursión lineal tipo factorial)
+            n = self.n
+            if rhs.has(self.T(n - 1)) or rhs.has(self.T(n - sp.Integer(1))):
+                return "O(n)"
+
+            # Caso 2: T(n) = T(n/2) + c    -> O(log n)  (búsqueda binaria)
+            if rhs.has(self.T(n / 2)):
+                # Confirmar que sólo hay UNA llamada recursiva
+                calls = [arg for arg in rhs.atoms(sp.Function) if arg.func == self.T]
+                if len(calls) == 1:
+                    return "O(log(n))"
+
+            # Caso 3: T(n) = 2*T(n/2) + f(n)  -> típicamente O(n log n)
+            # (merge sort / divide & conquer balanceado)
+            if rhs.has(2 * self.T(n / 2)):
+                return "O(n*log(n))"
+
             return None
 
-        rhs = eq.rhs
-        recursive_terms = [
-            subexpr for subexpr in sympy.preorder_traversal(rhs)
-            if isinstance(subexpr, sympy.Function) and subexpr.func == self.T
-        ]
-
-        if not recursive_terms:
+        except Exception:
             return None
-
-        decrements = []
-        for term in recursive_terms:
-            arg = term.args[0]
-            diff = sympy.simplify(arg - self.n)
-            if diff.is_Number:
-                decrements.append(diff)
-            else:
-                decrements.append(None)
-
-        if len(recursive_terms) >= 2 and all(d is not None and d < 0 for d in decrements):
-            return "O(2**n)"
-
-        if len(recursive_terms) == 1 and decrements[0] is not None and decrements[0] < 0:
-            return "O(n)"
-
-        return None

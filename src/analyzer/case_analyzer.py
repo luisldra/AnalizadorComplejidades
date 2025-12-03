@@ -43,6 +43,8 @@ class CaseAnalyzer:
     
     Identifica patrones comunes y escenarios típicos para diferentes
     estructuras algorítmicas.
+    Nota: combina heurísticas por AST, nombre de función y complejidad/recurrencia
+    para producir escenarios legibles en el reporte.
     """
     
     def __init__(self):
@@ -50,99 +52,138 @@ class CaseAnalyzer:
         self.analysis_cache: Dict[str, Dict[str, CaseAnalysis]] = {}
     
     def analyze_all_cases(self, ast, algorithm_type: str = 'unknown', 
-                         recurrence_eq: str = None, complexity: str = None) -> Dict[str, CaseAnalysis]:
+                      recurrence_eq: str = None, complexity: str = None) -> Dict[str, CaseAnalysis]:
         """
         Analiza todos los casos (mejor, peor, promedio) de un algoritmo.
-        
-        Args:
-            ast: AST del algoritmo
-            algorithm_type: Tipo de algoritmo detectado
-            recurrence_eq: Ecuación de recurrencia detectada (para validar coherencia)
-            complexity: Complejidad asintótica calculada (para validar coherencia)
-            
-        Returns:
-            Dict con 'best', 'worst', 'average' casos
+
+        Orden de prioridad:
+        1) Patrón estructural en el AST (más fiable para casos concretos).
+        2) Nombre de la función (pistas como 'busqueda_binaria', 'es_primo', etc.).
+        3) Ecuación de recurrencia / complejidad matemática (para afinar tipo).
+        4) Fallback puramente matemático si no hay nada más.
         """
-        
-        return self._build_math_based_cases(recurrence_eq, complexity)
+        # --- Nombre de la función para heurísticas por nombre ---
+        func_name = ""
+        if hasattr(ast, 'functions') and ast.functions:
+            func_name = ast.functions[0].name.lower()
+        elif hasattr(ast, 'name'):
+            func_name = str(ast.name).lower()
 
-    def _build_math_based_cases(self, recurrence_eq: Optional[str], complexity: Optional[str]) -> Dict[str, CaseAnalysis]:
-        """Genera descripciones basadas únicamente en la información matemática disponible."""
-        recurrence_text = recurrence_eq or "No se detectó una ecuación de recurrencia (algoritmo iterativo)."
-        complexity_text = complexity or "Complejidad no determinada"
+        # --- 1) Siempre intentamos detectar el tipo desde el AST ---
+        detected_type = 'unknown'
+        try:
+            detected_type = self._detect_algorithm_type(ast)
+        except Exception:
+            pass
 
-        best_case = CaseAnalysis(
-            case_type='best',
-            complexity=complexity_text,
-            scenario="Se alcanza inmediatamente el caso base; no se expande la recurrencia más allá del primer nivel.",
-            ejemplo="Evaluar la ecuación con los valores base declarados.",
-            explanation=f"La cota proviene directamente del motor matemático.\nEcuación utilizada: {recurrence_text}"
-        )
+        # El tipo base es: lo que detectamos en el AST, luego lo que venga de fuera
+        algorithm_type = detected_type if detected_type != 'unknown' else (algorithm_type or 'unknown')
 
-        worst_case = CaseAnalysis(
-            case_type='worst',
-            complexity=complexity_text,
-            scenario="Se expande la recurrencia completa hasta que n alcanza el caso base.",
-            ejemplo="Expandir T(n) de forma simbólica aplicando la ecuación derivada hasta n = 1.",
-            explanation=f"El costo refleja la expansión total de {recurrence_text}.\nNo se aplican plantillas heurísticas, solo la ecuación obtenida."
-        )
+        # --- 2) Refinar con recurrencia / complejidad matemática si están disponibles ---
+        rec_str = recurrence_eq or ""
+        comp_str = complexity or ""
+        try:
+            if rec_str or comp_str:
+                algorithm_type = self._validate_and_refine_type(
+                    algorithm_type,
+                    rec_str,
+                    comp_str,
+                    ast
+                )
+        except Exception:
+            # Si algo falla en el refinamiento, seguimos con el tipo que teníamos
+            pass
 
-        average_case = CaseAnalysis(
-            case_type='average',
-            complexity=complexity_text,
-            scenario="Sin datos estadísticos adicionales, se asume el mismo comportamiento asintótico.",
-            ejemplo="Integrar el aporte de cada nivel de la recurrencia y normalizar por el número de configuraciones.",
-            explanation=f"El motor matemático no introduce variaciones heurísticas; reporta la misma cota derivada de {recurrence_text}."
-        )
+        # --- 3) Forzar patrones bien conocidos independientemente de lo anterior ---
+
+        # 3.a) Búsqueda binaria: por nombre o por patrón de división + recursión
+        if (
+            'busqueda_binaria' in func_name
+            or 'binary_search' in func_name
+            or self._has_binary_search_pattern(ast)
+        ):
+            algorithm_type = 'binary_search'
+
+        # 3.b) Test de primalidad ingenuo: bucle con n % i == 0 y return dentro (protegido)
+        if self._is_prime_like_pattern_safe(ast):
+            algorithm_type = 'prime_test'
+
+        # --- 4) Si no tenemos nada de info matemática, usamos el fallback puramente matemático ---
+        if not complexity and not recurrence_eq:
+            return self._build_math_based_cases(recurrence_eq, complexity)
+
+        # --- 5) Construir los tres casos en función del tipo que quedó ---
+        best_case = self._analyze_best_case(ast, algorithm_type, comp_str)
+        worst_case = self._analyze_worst_case(ast, algorithm_type, comp_str)
+        average_case = self._analyze_average_case(ast, algorithm_type, comp_str)
+
+        # Ajustes específicos por nombre/patrón
+        func_name_lower = func_name.lower()
+        if algorithm_type == 'fibonacci' or 'fib' in func_name_lower:
+            best_case.complexity = "Θ(2^n)"
+            worst_case.complexity = "Θ(2^n)"
+            average_case.complexity = "Θ(2^n)"
+
+        if algorithm_type == 'divide_conquer' and ('quick' in func_name_lower or 'qsort' in func_name_lower):
+            # Peor caso clásico de QuickSort desbalanceado
+            worst_case.complexity = "Θ(n^2)"
 
         return {
             'best': best_case,
             'worst': worst_case,
             'average': average_case
         }
+
     
-    def _validate_and_refine_type(self, detected_type: str, recurrence: str, 
-                                   complexity: str, ast) -> str:
+    def _validate_and_refine_type(self, detected_type: str, recurrence: str,
+                                  complexity: str, ast) -> str:
         """
         Valida que el tipo detectado sea coherente con la ecuación y complejidad.
         Refina el tipo si hay inconsistencias.
         """
-        # Extraer el nombre de la función para contexto
+        recurrence = (recurrence or "").replace(" ", "")
+        complexity_low = (complexity or "").lower()
+
+        # Nombre de la función, por si ayuda (fib, hanoi, etc.)
         func_name = ""
-        if hasattr(ast, 'functions') and ast.functions:
+        if hasattr(ast, "functions") and ast.functions:
             func_name = ast.functions[0].name.lower()
-        
-        # REGLA 1: Si la complejidad es O(log n) o Θ(log n), ES búsqueda binaria
-        if 'log' in complexity.lower() and '2^' not in complexity and 'n log' not in complexity:
-            return 'binary_search'
-        
-        # REGLA 2: Si la ecuación es T(n-1) + T(n-2), ES Fibonacci
-        if 'T(n-1)' in recurrence and 'T(n-2)' in recurrence:
-            return 'fibonacci'
-        
-        # REGLA 3: Si la complejidad es O(n log n), ES divide & conquer
-        if 'n log' in complexity.lower() or 'nlog' in complexity.lower():
-            return 'divide_conquer'
-        
-        # REGLA 4: Si la complejidad es O(2^n) o exponencial
-        if '2^' in complexity or 'φ^' in complexity or 'exponential' in complexity.lower():
-            # Verificar si es Fibonacci específicamente
-            if 'fib' in func_name or ('T(n-1)' in recurrence and 'T(n-2)' in recurrence):
-                return 'fibonacci'
-            else:
-                return 'recursive'  # Recursión exponencial genérica
-        
-        # REGLA 5: Si la ecuación tiene 2 llamadas recursivas con división (merge sort)
-        if '2T(n/2)' in recurrence or 'T(n/2)' in recurrence:
-            # Verificar que NO sea búsqueda binaria (que solo tiene 1 llamada efectiva)
+
+        # --- FIBONACCI / EXPONENCIAL ---
+        if "t(n-1)" in recurrence and "t(n-2)" in recurrence:
+            return "fibonacci"
+
+        if "fib" in func_name:
+            return "fibonacci"
+
+        # --- BÚSQUEDA BINARIA ---
+        # Patrones típicos:
+        #  - recurrencia con T(n/2)
+        #  - complejidad logarítmica
+        if "t(n/2)" in recurrence or "t(n/2)+o(1)" in recurrence:
+            if "log" in complexity_low and "nlog" not in complexity_low and "2^" not in complexity_low:
+                return "binary_search"
+
+        # Además, si el AST muestra división de intervalo a la mitad, lo forzamos
+        if self._has_binary_search_pattern(ast):
+            return "binary_search"
+
+        # --- DIVIDE & CONQUER GENERAL (merge sort, quick sort bueno, etc.) ---
+        if "nlog" in complexity_low or "n*log" in complexity_low:
+            return "divide_conquer"
+
+        # --- EXPONENCIAL GENERAL ---
+        if "2^" in complexity_low or "exp(" in complexity_low or "φ" in complexity_low:
+            # Si el patrón AST es fibonacciesco pero el nombre no lo dice
             recursive_calls = self._count_active_recursive_calls(ast)
             if recursive_calls >= 2:
-                return 'divide_conquer'
-            else:
-                return 'binary_search'
-        
-        # Si no hay inconsistencias claras, mantener el tipo detectado
+                return "fibonacci"
+            return "recursive"
+
+        # Si nada de lo anterior aplica, nos quedamos con el tipo detectado por estructuras
         return detected_type
+
+
     
     def _count_active_recursive_calls(self, ast) -> int:
         """
@@ -312,10 +353,16 @@ class CaseAnalyzer:
         """Detecta patrón de dividir y conquistar."""
         # Buscar funciones con llamadas recursivas múltiples y división del problema
         if hasattr(ast, 'functions'):
-            for func in ast.functions:
-                recursive_calls = self._count_recursive_calls(func, func.name)
-                if recursive_calls >= 2:  # Merge sort, quicksort, etc.
-                    return True
+            funcs = ast.functions
+        elif isinstance(ast, Function):
+            funcs = [ast]
+        else:
+            funcs = []
+
+        for func in funcs:
+            recursive_calls = self._count_recursive_calls(func, func.name)
+            if recursive_calls >= 2:  # Merge sort, quicksort, etc.
+                return True
         return False
     
     def _count_recursive_calls(self, node, func_name: str) -> int:
@@ -396,6 +443,90 @@ class CaseAnalyzer:
         
         return False
     
+    def _is_prime_like_pattern(self, ast) -> bool:
+        """
+        Detecta un test de primalidad ingenuo del estilo:
+
+            for i = 2 to n-1:
+                if n % i == 0:
+                    return 0
+            return 1
+
+        Criterios:
+          - Nombre de la función contenga 'primo' o 'prime', o
+          - Exista un bucle con una condición que use módulo (%) y un return dentro.
+        """
+        # Pista por nombre
+        if hasattr(ast, 'functions') and ast.functions:
+            func = ast.functions[0]
+            name = func.name.lower()
+            if 'primo' in name or 'prime' in name:
+                return True
+
+        # Pista estructural: bucle + condición con módulo + return
+        return self._has_modulo_guard_with_return(ast)
+
+    def _has_modulo_guard_with_return(self, node) -> bool:
+        """
+        Busca un patrón 'if (algo % algo == 0) then return ...' dentro de un bucle.
+        """
+        # Si es un bucle, miramos su cuerpo
+        if isinstance(node, (For, While)):
+            body = getattr(node, 'body', []) or []
+            for stmt in body:
+                # if (...) { ... return ... }
+                if isinstance(stmt, If):
+                    if self._condition_has_modulo(stmt.condition) and self._has_return_in_if(stmt):
+                        return True
+
+        # Recorrer recursivamente el resto del AST
+        for attr_name in dir(node):
+            if attr_name.startswith('_'):
+                continue
+            attr = getattr(node, attr_name)
+            if isinstance(attr, (list, tuple)):
+                for item in attr:
+                    if hasattr(item, '__dict__'):
+                        if self._has_modulo_guard_with_return(item):
+                            return True
+            elif hasattr(attr, '__dict__'):
+                if self._has_modulo_guard_with_return(attr):
+                    return True
+
+        return False
+
+    def _is_prime_like_pattern_safe(self, ast) -> bool:
+        """
+        Wrapper seguro para detectar el patrón de primalidad evitando errores de metadatos.
+        """
+        try:
+            return self._is_prime_like_pattern(ast)
+        except Exception:
+            return False
+
+    def _condition_has_modulo(self, cond) -> bool:
+        """
+        Devuelve True si la condición (o sub-expresiones) contiene una operación módulo '%'.
+        """
+        if isinstance(cond, BinOp) and getattr(cond, 'op', None) == '%':
+            return True
+
+        # Buscar recursivamente en subexpresiones
+        for attr_name in dir(cond):
+            if attr_name.startswith('_'):
+                continue
+            attr = getattr(cond, attr_name)
+            if isinstance(attr, (list, tuple)):
+                for item in attr:
+                    if hasattr(item, '__dict__') and self._condition_has_modulo(item):
+                        return True
+            elif hasattr(attr, '__dict__'):
+                if self._condition_has_modulo(attr):
+                    return True
+
+        return False
+
+    
     def _has_fibonacci_decrement_pattern(self, node) -> bool:
         """
         Verifica si las llamadas recursivas tienen el patrón n-1 y n-2.
@@ -426,251 +557,374 @@ class CaseAnalyzer:
         return 1 in decrements and 2 in decrements
     
     def _analyze_best_case(self, ast, algorithm_type: str, complexity: str = None) -> CaseAnalysis:
-        """
-        Analiza el mejor caso del algoritmo.
-        
-        Args:
-            ast: AST del algoritmo
-            algorithm_type: Tipo de algoritmo detectado
-            complexity: Complejidad asintótica para validación (opcional)
-        """
-        
-        # Extraer nombre de función para contexto
         func_name = "algoritmo"
         if hasattr(ast, 'functions') and ast.functions:
             func_name = ast.functions[0].name
-        
+
+        comp = complexity or ""
+
         best_cases = {
-            'fibonacci': CaseAnalysis(
-                case_type='best',
-                complexity='Θ(1)',
-                scenario='Caso base alcanzado inmediatamente (n=0 o n=1)',
-                ejemplo=f'{func_name}(0) o {func_name}(1) → retorno directo sin recursión',
-                explanation='El algoritmo termina sin recursión cuando n es 0 o 1. Sin embargo, para n>1, siempre es exponencial.'
+            "fibonacci": CaseAnalysis(
+                case_type="best",
+                complexity=comp or "Θ(2ⁿ)",
+                scenario="Para n > 1 el árbol recursivo completo siempre se genera; no hay entradas “más fáciles”.",
+                ejemplo=f"{func_name}(n) con n > 1 ejecuta siempre el mismo patrón de llamadas.",
+                explanation=(
+                    "Fibonacci recursivo sin memoización es determinista: para cada n > 1 el número de llamadas está fijado. "
+                    "Asintóticamente, mejor, peor y promedio coinciden en Θ(2ⁿ). Para n = 0 o n = 1 el coste se reduce a Θ(1)."
+                ),
             ),
             'binary_search': CaseAnalysis(
                 case_type='best',
                 complexity='Θ(1)',
-                scenario='El elemento buscado está en la posición central en la primera comparación',
-                ejemplo=f'En {func_name}([1,2,3,4,5], 3): El elemento 3 está en el centro, encontrado inmediatamente',
-                explanation='La búsqueda binaria termina en O(1) cuando el elemento está exactamente en el punto medio del espacio de búsqueda inicial.'
+                scenario='El elemento buscado está justo en la posición central en la primera comparación.',
+                ejemplo=f'{func_name}([1,2,3,4,5], 3) → se encuentra en el primer intento.',
+                explanation='En el mejor caso sólo se realiza una comparación antes de retornar el resultado.'
             ),
-            'divide_conquer': CaseAnalysis(
-                case_type='best',
-                complexity='Θ(n log n)' if complexity and 'n log' in complexity else 'Θ(n)',
-                scenario='Divide & Conquer mantiene su complejidad independiente de la distribución de datos',
-                ejemplo=f'{func_name} ejecuta siempre el mismo número de divisiones: log₂(n) niveles',
-                explanation='Algoritmos como MergeSort dividen el problema en mitades balanceadas siempre, sin importar si los datos están ordenados o no. El mejor caso coincide con el peor caso.'
-            ),
-            'recursive': CaseAnalysis(
+            'prime_test': CaseAnalysis(
                 case_type='best',
                 complexity='Θ(1)',
-                scenario='Caso base alcanzado inmediatamente',
-                ejemplo=f'{func_name}(0) o {func_name}(1) → retorno directo sin recursión',
-                explanation='Cuando la recursión alcanza el caso base sin hacer más llamadas recursivas.'
+                scenario='Se detecta un caso trivial (n ≤ 1) o un divisor muy pequeño en la primera iteración.',
+                ejemplo=f'{func_name}(1), {func_name}(0) o {func_name}(4) → se devuelve enseguida.',
+                explanation=('El mejor caso ocurre cuando se sale por el caso base n ≤ 1 o cuando el primer divisor probado '
+                             'divide a n (por ejemplo i = 2 en un bucle que prueba divisores).')
             ),
-            'nested_loops': CaseAnalysis(
-                case_type='best',
-                complexity='Θ(n²)',
-                scenario='Bucles anidados sin condiciones de salida temprana',
-                ejemplo='Multiplicación de matrices, bubble sort completo',
-                explanation='Bucles anidados ejecutan todas las iteraciones sin optimización'
+            "recursive": CaseAnalysis(
+                case_type="best",
+                complexity=comp or "Θ(n)",
+                scenario="Recursión determinista sin ramas de salida temprana dependientes de los datos.",
+                ejemplo=f"{func_name}(n) recorre siempre la misma profundidad de recursión para ese n (como factorial).",
+                explanation=(
+                    "Cuando la recursión sólo depende del parámetro de tamaño (ej. factorial), "
+                    "todas las entradas de tamaño n inducen el mismo trabajo. "
+                    "Asintóticamente, la mejor cota coincide con la peor y la promedio."
+                ),
             ),
-            'linear_search': CaseAnalysis(
-                case_type='best',
-                complexity='Θ(1)',
-                scenario='Elemento encontrado en la primera iteración o lista vacía',
-                ejemplo='buscar_lineal([5,2,3], 5) → encontrado en posición 0',
-                explanation='La búsqueda termina inmediatamente si el elemento está al inicio'
+            "binary_search": CaseAnalysis(
+                case_type="best",
+                complexity="Θ(1)",
+                scenario="El elemento buscado está exactamente en la posición central en la primera comparación.",
+                ejemplo=f"{func_name}([1,2,3,4,5], 3) → se encuentra en la primera comparación.",
+                explanation="En el mejor caso la búsqueda binaria termina tras una sola comparación.",
             ),
-            'linear_processing': CaseAnalysis(
-                case_type='best',
-                complexity='Θ(n)',
-                scenario='El algoritmo debe procesar todos los elementos (sin salida temprana)',
-                ejemplo=f'{func_name}(n) → procesa n elementos en todos los casos',
-                explanation='Algoritmos de procesamiento (suma, acumulación, transformación) deben completar todas las iteraciones, sin importar los datos. No hay "mejor caso" que evite el trabajo.'
+            "linear_search": CaseAnalysis(
+                case_type="best",
+                complexity="Θ(1)",
+                scenario="El elemento buscado aparece en la primera posición o la estructura está vacía.",
+                ejemplo="buscar_lineal([5,2,3], 5) → encontrado en el índice 0.",
+                explanation="La búsqueda lineal puede terminar tras revisar únicamente el primer elemento.",
             ),
-            'constant': CaseAnalysis(
-                case_type='best',
-                complexity='Θ(1)',
-                scenario='Operación directa sin iteraciones ni recursión',
-                ejemplo='acceso a arreglo, asignación simple',
-                explanation='Operaciones de tiempo constante'
-            )
+            "linear_processing": CaseAnalysis(
+                case_type="best",
+                complexity=comp or "Θ(n)",
+                scenario="El algoritmo debe procesar todos los elementos sin posibilidad de cortar antes.",
+                ejemplo=f"{func_name}(n) → recorre todos los elementos (por ejemplo, suma de un arreglo).",
+                explanation=(
+                    "En algoritmos de procesamiento puro (suma, acumulación, transformación), "
+                    "no hay condición de salida temprana: siempre se recorre toda la entrada."
+                ),
+            ),
+            "constant": CaseAnalysis(
+                case_type="best",
+                complexity="Θ(1)",
+                scenario="Operación directa sin iteraciones ni recursión.",
+                ejemplo="asignación simple, acceso a una posición de un arreglo.",
+                explanation="El tiempo de ejecución no depende del tamaño de la entrada.",
+            ),
         }
-        
-        return best_cases.get(algorithm_type, CaseAnalysis(
-            case_type='best',
-            complexity='Θ(1)',
-            scenario='Caso base o condición trivial',
-            ejemplo='N/A',
-            explanation='Mejor escenario posible de ejecución'
-        ))
+
+        # Algoritmos divide & conquer tipo MergeSort / QuickSort (mejor caso)
+        if algorithm_type == "divide_conquer":
+            return CaseAnalysis(
+                case_type="best",
+                complexity="Θ(n log n)",
+                scenario="La estrategia divide-y-vencerás se aplica con particiones razonablemente balanceadas.",
+                ejemplo=f"{func_name}(n) realiza ~log₂(n) niveles de división con trabajo lineal por nivel.",
+                explanation=(
+                    "En algoritmos como MergeSort y QuickSort (con pivote razonable), el número de niveles es O(log n) "
+                    "y cada nivel hace trabajo O(n), dando lugar a Θ(n log n) incluso en el mejor caso asintótico."
+                ),
+            )
+
+        # Bucles anidados sin early break: mejor caso = mismo orden que el peor
+        if algorithm_type == "nested_loops":
+            return CaseAnalysis(
+                case_type="best",
+                complexity=comp or "Θ(n²)",
+                scenario="Bucles anidados sin corte anticipado; los rangos se recorren completos.",
+                ejemplo="Triple bucle, multiplicación de matrices, bubble_sort sin optimizaciones.",
+                explanation=(
+                    "Si no hay break / return de salida temprana, el número de iteraciones de los bucles anidados "
+                    "depende sólo de n. El mejor caso es del mismo orden que el peor."
+                ),
+            )
+
+        # Si tenemos un caso específico en el diccionario, lo usamos
+        if algorithm_type in best_cases:
+            return best_cases[algorithm_type]
+
+        # Fallback genérico
+        return CaseAnalysis(
+            case_type="best",
+            complexity=comp or "Θ(1)",
+            scenario="Caso base o condición trivial.",
+            ejemplo="N/A",
+            explanation="Mejor escenario posible de ejecución.",
+        )
+
     
     def _analyze_worst_case(self, ast, algorithm_type: str, complexity: str = None) -> CaseAnalysis:
-        """
-        Analiza el peor caso del algoritmo.
-        
-        Args:
-            ast: AST del algoritmo
-            algorithm_type: Tipo de algoritmo detectado
-            complexity: Complejidad asintótica para validación (opcional)
-        """
-        
-        # Extraer nombre de función para contexto
+        """Analiza el peor caso del algoritmo."""
         func_name = "algoritmo"
         if hasattr(ast, 'functions') and ast.functions:
             func_name = ast.functions[0].name
-        
+
+        comp = complexity or ""
+
+        # nested_loops: el peor caso es exactamente la cota que dio el motor matemático
+        if algorithm_type == "nested_loops":
+            return CaseAnalysis(
+                case_type="worst",
+                complexity=comp or "Θ(n²)",
+                scenario="Todos los bucles anidados recorren su rango completo.",
+                ejemplo="bubble_sort con arreglo invertido; triple bucle sobre n.",
+                explanation=(
+                    "El motor matemático determinó la expresión de coste y su orden dominante; "
+                    "el peor caso coincide con esa cota (por ejemplo Θ(n²), Θ(n³), etc.)."
+                ),
+            )
+
+        # divide_conquer: diferenciamos entre MergeSort y QuickSort aproximando via AST
+        if algorithm_type == "divide_conquer":
+            # Heurística simple: si el nombre de la función o variables contienen 'quick' o 'pivot',
+            # asumimos QuickSort (peor caso n²); en otro caso, MergeSort-like (n log n).
+            func_lower = func_name.lower()
+            is_quick = "quick" in func_lower or "qsort" in func_lower
+
+            # Buscar identificadores tipo 'pivot' / 'pivote' en el AST
+            if hasattr(ast, "functions") and ast.functions:
+                for f in ast.functions:
+                    for attr_name in dir(f):
+                        if attr_name.startswith("_"):
+                            continue
+                        attr = getattr(f, attr_name)
+                        if isinstance(attr, Var):
+                            name = getattr(attr, "name", "").lower()
+                            if "pivot" in name or "pivote" in name:
+                                is_quick = True
+
+            if is_quick:
+                return CaseAnalysis(
+                    case_type="worst",
+                    complexity="Θ(n²)",
+                    scenario="Particiones extremadamente desbalanceadas (pivote siempre el mínimo o máximo).",
+                    ejemplo=f"{func_name} sobre un arreglo ya ordenado usando siempre el primer elemento como pivote.",
+                    explanation=(
+                        "En QuickSort, si el pivote parte el arreglo en 1 y n-1 elementos en cada llamada, "
+                        "se obtiene la recurrencia T(n) = T(n-1) + O(n), cuya solución es Θ(n²)."
+                    ),
+                )
+            else:
+                return CaseAnalysis(
+                    case_type="worst",
+                    complexity=comp or "Θ(n log n)",
+                    scenario="División razonablemente balanceada en cada nivel de recursión.",
+                    ejemplo=f"{func_name}(n) tipo MergeSort con particiones en mitades.",
+                    explanation=(
+                        "Cuando la estrategia de división no depende adversamente de la distribución de datos, "
+                        "la recurrencia T(n) = 2T(n/2) + O(n) se resuelve como Θ(n log n)."
+                    ),
+                )
+
+        if algorithm_type == "recursive":
+            return CaseAnalysis(
+                case_type="worst",
+                complexity=comp or "Θ(n)",
+                scenario="Profundidad de recursión máxima para entradas de tamaño n.",
+                ejemplo=f"{func_name}(n) recursivo sin poda ni memoización.",
+                explanation=(
+                    "La cota asintótica del peor caso coincide con la que devuelve el motor matemático "
+                    "(por ejemplo Θ(n) para factorial, Θ(2ⁿ) para recursiones exponenciales)."
+                ),
+            )
+
         worst_cases = {
-            'fibonacci': CaseAnalysis(
-                case_type='worst',
-                complexity='Θ(φⁿ) ≈ Θ(2ⁿ)',
-                scenario='Cualquier valor n > 1 (el algoritmo es determinista)',
-                ejemplo=f'{func_name}(10) genera ~2¹⁰ ≈ 1024 llamadas recursivas en un árbol binario',
-                explanation='Fibonacci recursivo sin memoización SIEMPRE es exponencial. La base exacta es φ≈1.618 (número áureo), pero O(2ⁿ) es la cota superior estándar. No hay "mejor o peor entrada", solo depende de n.'
+            "fibonacci": CaseAnalysis(
+                case_type="worst",
+                complexity="Θ(φⁿ) ≈ Θ(2ⁿ)",
+                scenario="Cualquier valor n > 1 (el algoritmo es determinista).",
+                ejemplo=f"{func_name}(10) genera ~2¹⁰ ≈ 1024 llamadas recursivas en un árbol binario.",
+                explanation=(
+                    "Fibonacci recursivo sin memoización SIEMPRE es exponencial. La base exacta es φ≈1.618, "
+                    "pero O(2ⁿ) es la cota superior estándar. No hay 'mejor o peor entrada', sólo depende de n."
+                ),
             ),
             'binary_search': CaseAnalysis(
                 case_type='worst',
                 complexity='Θ(log n)',
-                scenario='El elemento no está en el arreglo o está en una posición que requiere log₂(n) comparaciones',
-                ejemplo=f'{func_name}([1,2,3,4,5,6,7,8], 9) → log₂(8) = 3 divisiones hasta espacio vacío',
-                explanation='La búsqueda binaria divide el espacio de búsqueda a la mitad en cada paso. En el peor caso, necesita log₂(n) divisiones para reducir el espacio a 0.'
+                scenario='El elemento no está en el arreglo o se encuentra tras descartar casi todos los subarreglos.',
+                ejemplo=f'{func_name}([1,2,3,4,5,6,7,8], 9) → se exploran ~log₂(n) divisiones.',
+                explanation=('Cada comparación reduce el espacio de búsqueda a la mitad. '
+                             'En el peor caso se requieren O(log n) pasos antes de determinar la posición o ausencia.')
             ),
-            'divide_conquer': CaseAnalysis(
-                case_type='worst',
-                complexity='Θ(n log n)' if complexity and 'n log' in complexity else 'Θ(n²)',
-                scenario='MergeSort siempre O(n log n). QuickSort puede degradarse a O(n²) con pivotes malos',
-                ejemplo=f'{func_name} con datos en orden inverso o pivotes desbalanceados',
-                explanation='MergeSort siempre divide en mitades balanceadas (O(n log n) garantizado). QuickSort puede degradarse a O(n²) si el pivote es siempre el peor elemento.'
-            ),
-            'recursive': CaseAnalysis(
-                case_type='worst',
-                complexity='Θ(n)' if complexity and ('log' not in complexity and '2^' not in complexity) else 'Θ(2ⁿ)',
-                scenario='Recursión lineal (una llamada por nivel) o exponencial (múltiples llamadas)',
-                ejemplo=f'{func_name}(n) con recursión hasta n=0, generando n llamadas secuenciales',
-                explanation='Recursión lineal: cada llamada genera una sub-llamada (factorial, suma). Recursión exponencial: múltiples llamadas por nivel (sin memoización).'
-            ),
-            'nested_loops': CaseAnalysis(
-                case_type='worst',
-                complexity='Θ(n²) o Θ(n³)',
-                scenario='Todos los bucles ejecutan n iteraciones completas',
-                ejemplo='bubble_sort con arreglo invertido: [5,4,3,2,1]',
-                explanation='Cada elemento debe compararse con todos los demás'
-            ),
-            'linear_search': CaseAnalysis(
+            'prime_test': CaseAnalysis(
                 case_type='worst',
                 complexity='Θ(n)',
-                scenario='Elemento al final del arreglo o no encontrado',
-                ejemplo='buscar_lineal([1,2,3,4,5], 5) → n comparaciones',
-                explanation='Se recorre toda la estructura hasta el final'
+                scenario='n es primo o no tiene divisores pequeños; el bucle recorre todos los candidatos.',
+                ejemplo=f'{func_name}(p) donde p es primo grande → se prueban todos los i desde 2 hasta n-1.',
+                explanation=('En el peor caso se comprueban todos los posibles divisores hasta n-1, '
+                             'lo que implica un número lineal de iteraciones en n.')
             ),
-            'linear_processing': CaseAnalysis(
-                case_type='worst',
-                complexity='Θ(n)',
-                scenario='El algoritmo debe procesar todos los elementos (sin salida temprana)',
-                ejemplo=f'{func_name}(n) → procesa exactamente n elementos',
-                explanation='Algoritmos de procesamiento deben completar todas las iteraciones. El "peor caso" coincide con el "mejor caso" porque no hay optimización posible - todos los elementos se procesan.'
+            "binary_search": CaseAnalysis(
+                case_type="worst",
+                complexity="Θ(log n)",
+                scenario="El elemento no está en el arreglo o está en una posición que requiere todas las divisiones.",
+                ejemplo=f"{func_name}([1,2,3,4,5,6,7,8], 9) → log₂(8) divisiones hasta espacio vacío.",
+                explanation=(
+                    "La búsqueda binaria divide el espacio de búsqueda a la mitad en cada paso. "
+                    "En el peor caso necesita Θ(log n) comparaciones."
+                ),
             ),
-            'constant': CaseAnalysis(
-                case_type='worst',
-                complexity='Θ(1)',
-                scenario='Operación directa sin iteraciones',
-                ejemplo='suma = a + b',
-                explanation='Tiempo constante independiente del tamaño de entrada'
-            )
+            "linear_search": CaseAnalysis(
+                case_type="worst",
+                complexity="Θ(n)",
+                scenario="Elemento al final del arreglo o no encontrado.",
+                ejemplo="buscar_lineal([1,2,3,4,5], 5) → n comparaciones.",
+                explanation="Se recorre toda la estructura hasta el final.",
+            ),
+            "linear_processing": CaseAnalysis(
+                case_type="worst",
+                complexity=comp or "Θ(n)",
+                scenario="El algoritmo debe procesar todos los elementos (sin salida temprana).",
+                ejemplo=f"{func_name}(n) → procesa exactamente n elementos.",
+                explanation=(
+                    "Algoritmos de procesamiento deben completar todas las iteraciones. "
+                    "El 'peor caso' coincide con el 'mejor caso' porque no hay optimización posible."
+                ),
+            ),
+            "constant": CaseAnalysis(
+                case_type="worst",
+                complexity="Θ(1)",
+                scenario="Operación directa sin iteraciones ni recursión.",
+                ejemplo="suma = a + b.",
+                explanation="Tiempo constante independiente del tamaño de entrada.",
+            ),
         }
-        
-        return worst_cases.get(algorithm_type, CaseAnalysis(
-            case_type='worst',
-            complexity='Θ(n)',
-            scenario='Peor escenario de ejecución',
-            ejemplo='N/A',
-            explanation='Máximo número de operaciones requeridas'
-        ))
+
+        return worst_cases.get(
+            algorithm_type,
+            CaseAnalysis(
+                case_type="worst",
+                complexity=comp or "Θ(n)",
+                scenario="Peor escenario de ejecución.",
+                ejemplo="N/A",
+                explanation="Máximo número de operaciones requeridas.",
+            ),
+        )
+
     
     def _analyze_average_case(self, ast, algorithm_type: str, complexity: str = None) -> CaseAnalysis:
-        """
-        Analiza el caso promedio del algoritmo.
-        
-        Args:
-            ast: AST del algoritmo
-            algorithm_type: Tipo de algoritmo detectado
-            complexity: Complejidad asintótica para validación (opcional)
-        """
-        
-        # Extraer nombre de función para contexto
+        """Analiza el caso promedio del algoritmo."""
         func_name = "algoritmo"
         if hasattr(ast, 'functions') and ast.functions:
             func_name = ast.functions[0].name
-        
+
+        comp = complexity or ""
+
         average_cases = {
-            'fibonacci': CaseAnalysis(
-                case_type='average',
-                complexity='Θ(φⁿ) ≈ Θ(2ⁿ)',
-                scenario='Cualquier valor n > 1 (no depende de los datos, solo de n)',
-                ejemplo=f'{func_name}(n) siempre genera ~φⁿ llamadas, donde φ = 1.618... (proporción áurea)',
-                explanation='Fibonacci recursivo es DETERMINISTA: para un n dado, SIEMPRE ejecuta la misma cantidad de operaciones. No tiene "caso promedio" en el sentido tradicional porque no depende de la disposición de datos. La complejidad es Θ(φⁿ) exactamente, aproximada como O(2ⁿ).'
+            "fibonacci": CaseAnalysis(
+                case_type="average",
+                complexity="Θ(φⁿ) ≈ Θ(2ⁿ)",
+                scenario="Cualquier valor n > 1 (no depende de los datos, solo de n).",
+                ejemplo=f"{func_name}(n) siempre genera ~φⁿ llamadas, donde φ = 1.618...",
+                explanation=(
+                    "Fibonacci recursivo es determinista: para un n dado, siempre ejecuta la misma cantidad de operaciones. "
+                    "No tiene 'caso promedio' en el sentido tradicional porque no depende de la disposición de datos."
+                ),
             ),
             'binary_search': CaseAnalysis(
                 case_type='average',
                 complexity='Θ(log n)',
-                scenario='Elemento en una posición aleatoria del arreglo ordenado',
-                ejemplo=f'Promedio de log₂(n) comparaciones para encontrar un elemento al azar',
-                explanation='En promedio, la búsqueda binaria requiere ~log₂(n) comparaciones. Cada comparación elimina la mitad del espacio, por lo que en promedio se llega al elemento en tiempo logarítmico.'
+                scenario='El elemento buscado está en una posición aleatoria del arreglo ordenado o puede no estar.',
+                ejemplo='En promedio se realizan ~log₂(n) comparaciones.',
+                explanation=('Cada comparación descarta la mitad del espacio; para claves aleatorias o presencia/ausencia '
+                             'aleatoria, el número esperado de pasos es proporcional a log n.')
             ),
-            'divide_conquer': CaseAnalysis(
-                case_type='average',
-                complexity='Θ(n log n)' if complexity and 'n log' in complexity else 'Θ(n)',
-                scenario='Datos de entrada distribuidos aleatoriamente',
-                ejemplo=f'{func_name} con pivotes aleatorios o división balanceada típica',
-                explanation='En promedio, los algoritmos divide & conquer mantienen O(n log n). QuickSort con pivotes aleatorios evita el peor caso O(n²). MergeSort siempre es O(n log n).'
-            ),
-            'recursive': CaseAnalysis(
-                case_type='average',
-                complexity='Θ(n)' if complexity and ('log' not in complexity and '2^' not in complexity) else 'Θ(2ⁿ)',
-                scenario='Depende del tipo de recursión: lineal (una llamada) o exponencial (múltiples)',
-                ejemplo=f'Recursión lineal: {func_name}(n) hace n llamadas. Recursión exponencial: árbol de llamadas',
-                explanation='La complejidad promedio depende de la estructura: lineal T(n)=T(n-1)+c es O(n), exponencial sin memoización es O(2ⁿ).'
-            ),
-            'nested_loops': CaseAnalysis(
-                case_type='average',
-                complexity='Θ(n²)',
-                scenario='Datos de entrada aleatorios',
-                ejemplo='Ordenamiento con comparaciones típicas',
-                explanation='Número promedio de comparaciones para datos aleatorios'
-            ),
-            'linear_search': CaseAnalysis(
-                case_type='average',
-                complexity='Θ(n/2) = Θ(n)',
-                scenario='Elemento en posición aleatoria',
-                ejemplo='buscar_lineal → elemento en mitad del arreglo',
-                explanation='En promedio, se recorre la mitad de la estructura'
-            ),
-            'linear_processing': CaseAnalysis(
+            'prime_test': CaseAnalysis(
                 case_type='average',
                 complexity='Θ(n)',
-                scenario='El algoritmo debe procesar todos los elementos',
-                ejemplo=f'{func_name}(n) → siempre procesa n elementos',
-                explanation='No existe variación en el caso promedio. El algoritmo procesa todos los elementos independientemente de sus valores. El "caso promedio" coincide con el mejor y peor caso.'
+                scenario='n es un entero cualquiera, sin sesgo especial hacia primos o compuestos fáciles.',
+                ejemplo=f'En promedio se comprueba una fracción de los posibles divisores antes de encontrar uno o concluir primalidad.',
+                explanation=('Aunque muchas entradas compuestas se descartan antes de probar todos los divisores, '
+                             'asintóticamente la cantidad esperada de iteraciones sigue siendo lineal en n.')
             ),
-            'constant': CaseAnalysis(
-                case_type='average',
-                complexity='Θ(1)',
-                scenario='Operación directa',
-                ejemplo='Asignación o acceso directo',
-                explanation='Tiempo constante siempre'
-            )
+            "divide_conquer": CaseAnalysis(
+                case_type="average",
+                complexity="Θ(n log n)",
+                scenario="Datos de entrada distribuidos aleatoriamente.",
+                ejemplo=f"{func_name} con pivotes aleatorios o divisiones razonablemente balanceadas.",
+                explanation=(
+                    "En promedio, los algoritmos divide & conquer mantienen Θ(n log n). "
+                    "QuickSort con pivotes aleatorios evita el peor caso Θ(n²); MergeSort siempre es Θ(n log n)."
+                ),
+            ),
+            "recursive": CaseAnalysis(
+                case_type="average",
+                complexity=comp or "Θ(n)",
+                scenario="Depende del tipo de recursión: lineal (una llamada) o exponencial (múltiples).",
+                ejemplo=f"Recursión lineal: {func_name}(n) hace n llamadas; recursión exponencial: árbol de llamadas completo.",
+                explanation=(
+                    "La complejidad promedio depende de la estructura: lineal T(n)=T(n-1)+c es Θ(n), "
+                    "exponencial sin memoización es Θ(2ⁿ)."
+                ),
+            ),
+            "nested_loops": CaseAnalysis(
+                case_type="average",
+                complexity=comp or "Θ(n²)",
+                scenario="Datos de entrada aleatorios sin cambios en los límites de los bucles.",
+                ejemplo="Ordenamientos y algoritmos con bucles anidados que siempre recorren sus rangos completos.",
+                explanation=(
+                    "Si los límites de los bucles no dependen de la distribución de datos, "
+                    "el caso promedio tiene el mismo orden que el peor y el mejor caso."
+                ),
+            ),
+            "linear_search": CaseAnalysis(
+                case_type="average",
+                complexity="Θ(n/2) = Θ(n)",
+                scenario="Elemento en posición aleatoria.",
+                ejemplo="buscar_lineal → elemento en mitad del arreglo en promedio.",
+                explanation="En promedio, se recorre la mitad de la estructura.",
+            ),
+            "linear_processing": CaseAnalysis(
+                case_type="average",
+                complexity=comp or "Θ(n)",
+                scenario="El algoritmo procesa todos los elementos independientemente de sus valores.",
+                ejemplo=f"{func_name}(n) → siempre procesa n elementos.",
+                explanation=(
+                    "No existe variación relevante en el caso promedio: el algoritmo procesa todos los elementos "
+                    "independientemente de su contenido."
+                ),
+            ),
+            "constant": CaseAnalysis(
+                case_type="average",
+                complexity="Θ(1)",
+                scenario="Operación directa.",
+                ejemplo="Asignación o acceso directo.",
+                explanation="Tiempo constante siempre.",
+            ),
         }
-        
-        return average_cases.get(algorithm_type, CaseAnalysis(
-            case_type='average',
-            complexity='Θ(n)',
-            scenario='Caso promedio de ejecución',
-            ejemplo='N/A',
-            explanation='Complejidad esperada para datos aleatorios'
-        ))
-    
+
+        return average_cases.get(
+            algorithm_type,
+            CaseAnalysis(
+                case_type="average",
+                complexity=comp or "Θ(n)",
+                scenario="Caso promedio de ejecución.",
+                ejemplo="N/A",
+                explanation="Complejidad esperada para datos aleatorios.",
+            ),
+        )
+
     def get_case_comparison_summary(self, cases: Dict[str, CaseAnalysis]) -> str:
         """
         Genera un resumen comparativo de todos los casos.

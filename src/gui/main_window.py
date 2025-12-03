@@ -3,9 +3,10 @@ from tkinter import ttk, messagebox, scrolledtext
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 import matplotlib.pyplot as plt
 import os
+import time
 
 # Imports del sistema
-from AnalizadorComplejidades.src.gui.llm_window import LLMWindow
+from src.gui.llm_window import LLMWindow
 from src.config import get_algorithm_files
 from src.logic.analysis_orchestrator import AnalysisOrchestrator
 from src.gui.tree_visualizer_gui import TreeVisualizerGUI
@@ -23,6 +24,7 @@ class MainWindow:
         self.case_analyzer = CaseAnalyzer()
         
         self.gui_cache = {} 
+        self._timing_printed = False
         
         self._setup_ui()
         self.root.after(100, self._load_initial_data)
@@ -96,6 +98,9 @@ class MainWindow:
         files = get_algorithm_files()
         for item in self.tree_list.get_children():
             self.tree_list.delete(item)
+        
+        total_start = time.perf_counter()
+        timing_rows = []
             
         for file_path in files:
             result = self.orchestrator.process_file(file_path)
@@ -105,6 +110,20 @@ class MainWindow:
                 self.tree_list.insert("", tk.END, iid=result.filename, values=(result.filename, "ERROR"))
             else:
                 self.tree_list.insert("", tk.END, iid=result.filename, values=(result.filename, result.heur_complexity))
+            
+            timing_ms = result.elapsed_ms
+            if timing_ms is None:
+                timing_ms = (time.perf_counter() - total_start) * 1000
+            timing_rows.append((result.filename, timing_ms))
+
+        # Imprimir tiempos de análisis por archivo y total (solo al cargar una vez)
+        if not getattr(self, "_timing_printed", False):
+            total_ms = (time.perf_counter() - total_start) * 1000
+            print("\nTiempos de análisis inicial:")
+            for fname, ms in timing_rows:
+                print(f"   - {fname}: {ms:.2f} ms")
+            print(f"   Total: {total_ms:.2f} ms\n")
+            self._timing_printed = True
 
     def _on_item_selected(self, event):
         selection = self.tree_list.selection()
@@ -167,6 +186,13 @@ class MainWindow:
         w(f"  Explicación:")
         w(f"    {res.heur_explanation}")
         w("└" + "─"*90 + "┘\n")
+
+        # Costos por nivel (solo si es recursivo)
+        if getattr(res, "is_recursive", False) and getattr(res, "level_costs", []):
+            w("┌─ Costos por nivel (recursivo) " + "─"*54 + "┐", "box")
+            for line in res.level_costs:
+                w(f"  - {line}")
+            w("└" + "─"*90 + "┘\n")
 
         # 3. Escenarios
         w("┌─ 🔍 ANÁLISIS DE MEJOR, PEOR Y CASO PROMEDIO " + "─"*50 + "┐", "box")

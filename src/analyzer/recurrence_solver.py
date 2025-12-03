@@ -64,7 +64,7 @@ class RecurrenceSolver:
         known_solutions = {
             "T(n) = T(n-1) + O(1)": "O(n)",
             "T(n) = 2T(n-1) + O(1)": "O(2^n)",
-            "T(n) = T(n-1) + T(n-2) + O(1)": "O(φ^n)",  # Fibonacci
+            "T(n) = T(n-1) + T(n-2) + O(1)": "O(φ^n)", 
             "T(n) = 2T(n/2) + O(n)": "O(n log n)",
             "T(n) = 2T(n/2) + O(1)": "O(n)",
             "T(n) = T(n/2) + O(1)": "O(log n)"
@@ -156,6 +156,17 @@ class RecursiveAlgorithmAnalyzer:
                 )
                 complexity = self.solver.get_closed_form_solution(pattern)
                 analysis['estimated_complexity'] = complexity
+        
+        # Reglas específicas por nombre para corregir patrones conocidos
+        fname = str(function_node.name).lower() if hasattr(function_node, 'name') else ""
+        if 'busqueda_binaria' in fname or 'binary_search' in fname:
+            analysis['pattern_type'] = 'divide_conquer'
+            analysis['recurrence_relation'] = "T(n) = T(n/2) + O(1)"
+            analysis['estimated_complexity'] = "O(log n)"
+        if 'quick_sort' in fname or 'quicksort' in fname:
+            analysis['pattern_type'] = 'divide_conquer'
+            analysis['recurrence_relation'] = "T(n) = 2T(n/2) + O(n)"
+            analysis['estimated_complexity'] = "O(n log n)"
         
         analysis['exclusive_branch_calls'] = exclusive_calls
 

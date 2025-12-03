@@ -1,10 +1,17 @@
-lark-parser      # Parsing con gramática (puedes usar ANTLR también)
-sympy            # Manipulación simbólica y resolución de recurrencias
-networkx         # Grafos (CFG, árboles de recurrencia)
-graphviz         # Visualización de grafos
-pytest           # Testing
-fastapi          # API REST (opcional, si quieres exponer servicio)
-uvicorn          # Servidor ASGI para FastAPI
-matplotlib       # Gráficos y visualizaciones científicas
-pillow           # Manipulación de imágenes (PNG)
-pydot            # Interface Python para Graphviz
+# Núcleo de análisis
+lark-parser           # Parser Lark para pseudocodigo
+sympy                 # Algebra simbólica y recurrencias
+
+# Visualización
+matplotlib            # Gráficos (GUI y árboles/flujo)
+networkx              # Diagramas de flujo
+pillow                # Backend de imágenes (matplotlib)
+
+# Configuración / entorno
+python-dotenv         # Carga de variables (.env) para API keys
+
+# IA (opcional)
+google-generativeai   # Gemini (solo si usas la ventana IA)
+
+# Testing
+pytest                # Tests unitarios

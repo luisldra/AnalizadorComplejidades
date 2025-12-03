@@ -78,7 +78,6 @@ def check_dependencies():
     
     return True
 
-
 def main():
     """Función principal que lanza la GUI."""
     
