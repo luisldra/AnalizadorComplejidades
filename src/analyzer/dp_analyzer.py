@@ -2,7 +2,7 @@
 Analizador de Programación Dinámica - Refactorizado
 ==========================================
 
-Este módulo implementa el analizador de Programación Dinámica principal siguiendo SRP.
+Este módulo implementa el analizador de Programación Dinámica.
 Se coordina entre diferentes componentes especializados para el análisis de recurrencia.
 """
 
@@ -80,7 +80,7 @@ class DynamicProgrammingAnalyzer:
                 pattern_type="fibonacci_like",
                 base_cases={"T(0)": "1", "T(1)": "1"},
                 recurrence_formula="T(n) = T(n-1) + T(n-2) + O(1)",
-                solution="phi^n",  # Golden ratio
+                solution="2^n", 
                 confidence=0.85
             ),
             RecurrencePattern(

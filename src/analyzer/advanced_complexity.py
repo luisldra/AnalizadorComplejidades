@@ -101,7 +101,7 @@ class AdvancedComplexityAnalyzer:
         if not node.functions:
             return ComplexityResult("1", "1")
         
-        # Para programas con múltiples funciones, típicamente analizamos la función principal
+        # Para programas con múltiples funciones, analizamos la función principal
         # o retornamos la complejidad máxima entre todas las funciones
         results = [self._analyze_node(func) for func in node.functions]
         return self._combine_parallel(results)
@@ -165,7 +165,6 @@ class AdvancedComplexityAnalyzer:
         body_results = [self._analyze_node(stmt) for stmt in node.body]
         body_complexity = self._combine_sequential(body_results)
         
-        # Los bucles while son más difíciles de analizar - hacemos estimaciones conservadoras
         # Mejor caso: condición falsa inmediatamente (Ω(1))
         # Peor caso: asumir O(n) iteraciones (podría ser más dependiendo del algoritmo)
         worst_case = self._multiply_complexity(ComplexityFunction("n"), body_complexity)

@@ -25,7 +25,7 @@ class AnalysisResult:
     tree_structure_data: Dict = field(default_factory=dict)
     error: Optional[str] = None
     
-    # Campos enriquecidos por LLM (opcionales)
+    # Campos enriquecidos por LLM
     llm_reasoning: str = ""
     llm_pattern: str = ""
     llm_validation: str = ""
@@ -34,7 +34,7 @@ class AnalysisResult:
     llm_cost_us: Optional[int] = None
     source_prompt: Optional[str] = None  # descripcion en lenguaje natural, si aplica
     
-    # Costos por nivel para algoritmos recursivos (cuando aplica)
+    # Costos por nivel para algoritmos recursivos
     level_costs: list = field(default_factory=list)
     
     # Métrica de tiempo (ms) para el análisis de este algoritmo

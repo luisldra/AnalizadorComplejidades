@@ -82,7 +82,7 @@ def main():
     """Función principal que lanza la GUI."""
     
     print("=" * 60)
-    print("🎓 ANALIZADOR DE COMPLEJIDADES DE ALGORITMOS")
+    print("ANALIZADOR DE COMPLEJIDADES DE ALGORITMOS")
     print("   Interfaz Gráfica de Usuario (GUI)")
     print("=" * 60)
     print("Universidad de Caldas")
@@ -91,13 +91,13 @@ def main():
     print()
     
     # Verificar dependencias
-    print("🔍 Verificando dependencias...")
+    print("Verificando dependencias...")
     if not check_dependencies():
         return
     
-    print("✅ Todas las dependencias están instaladas")
+    print("Todas las dependencias están instaladas")
     print()
-    print("🚀 Iniciando interfaz gráfica...")
+    print("Iniciando interfaz gráfica...")
     print()
     
     try:
@@ -105,33 +105,25 @@ def main():
         root = tk.Tk()
         
         # Configuración de la ventana
-        root.title("Analizador de Complejidades")
-        
-        # Centrar ventana
-        window_width = 1400
-        window_height = 750 
-        screen_width = root.winfo_screenwidth()
-        screen_height = root.winfo_screenheight()
-        x = (screen_width - window_width) // 2
-        y = (screen_height - window_height) // 2
-        root.geometry(f'{window_width}x{window_height}+{x}+{y}')
+        root.title("Analizador de Complejidades - LDRA UCaldas")
+        root.state('zoomed')  # Maximizar ventana (Windows)
         
         # Crear aplicación
         app = MainWindow(root)
         
-        print("✅ Interfaz gráfica iniciada correctamente")
-        print("   1. Haga clic en '📁 Abrir Archivo' para cargar pseudocódigo")
+        print("Interfaz gráfica iniciada correctamente")
+        print("   1. Haga clic en los archivos para ver los reportes")
         print("   2. O escriba directamente en el editor")
-        print("   3. Haga clic en '▶️ Analizar' para iniciar el análisis")
+        print("   3. Puede analizar un codigo diferente con IA, presionando el boton 'Analizar con IA'")
         print()
         
         # Iniciar loop de eventos
         root.mainloop()
         
-        print("\n👋 Aplicación cerrada correctamente")
+        print("\n Aplicación cerrada correctamente")
         
     except Exception as e:
-        print(f"\n❌ Error al iniciar la aplicación: {e}")
+        print(f"\n Error al iniciar la aplicación: {e}")
         import traceback
         traceback.print_exc()
         
@@ -150,9 +142,9 @@ if __name__ == "__main__":
     try:
         main()
     except KeyboardInterrupt:
-        print("\n\n👋 Aplicación interrumpida por el usuario")
+        print("\n\n Aplicación interrumpida por el usuario")
     except Exception as e:
-        print(f"\n❌ Error inesperado: {e}")
+        print(f"\n Error inesperado: {e}")
         import traceback
         traceback.print_exc()
         sys.exit(1)

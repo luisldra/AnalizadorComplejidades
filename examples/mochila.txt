@@ -1,0 +1,35 @@
+function knapsack_01(values, weights, n, W)
+begin
+    for i = 0 to n do
+    begin
+        for w = 0 to W do
+        begin
+            if i == 0 or w == 0
+            begin
+                dp[i][w] = 0
+            end
+            else
+            begin
+                if weights[i - 1] <= w
+                begin
+                    include_value = values[i - 1] + dp[i - 1][w - weights[i - 1]]
+                    exclude_value = dp[i - 1][w]
+                    if include_value > exclude_value
+                    begin
+                        dp[i][w] = include_value
+                    end
+                    else
+                    begin
+                        dp[i][w] = exclude_value
+                    end
+                end
+                else
+                begin
+                    dp[i][w] = dp[i - 1][w]
+                end
+            end
+        end
+    end
+
+    return dp[n][W]
+end

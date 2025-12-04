@@ -64,7 +64,7 @@ class RecurrenceSolver:
         known_solutions = {
             "T(n) = T(n-1) + O(1)": "O(n)",
             "T(n) = 2T(n-1) + O(1)": "O(2^n)",
-            "T(n) = T(n-1) + T(n-2) + O(1)": "O(φ^n)", 
+            "T(n) = T(n-1) + T(n-2) + O(1)": "O(2^n)", 
             "T(n) = 2T(n/2) + O(n)": "O(n log n)",
             "T(n) = 2T(n/2) + O(1)": "O(n)",
             "T(n) = T(n/2) + O(1)": "O(log n)"
@@ -156,17 +156,6 @@ class RecursiveAlgorithmAnalyzer:
                 )
                 complexity = self.solver.get_closed_form_solution(pattern)
                 analysis['estimated_complexity'] = complexity
-        
-        # Reglas específicas por nombre para corregir patrones conocidos
-        fname = str(function_node.name).lower() if hasattr(function_node, 'name') else ""
-        if 'busqueda_binaria' in fname or 'binary_search' in fname:
-            analysis['pattern_type'] = 'divide_conquer'
-            analysis['recurrence_relation'] = "T(n) = T(n/2) + O(1)"
-            analysis['estimated_complexity'] = "O(log n)"
-        if 'quick_sort' in fname or 'quicksort' in fname:
-            analysis['pattern_type'] = 'divide_conquer'
-            analysis['recurrence_relation'] = "T(n) = 2T(n/2) + O(n)"
-            analysis['estimated_complexity'] = "O(n log n)"
         
         analysis['exclusive_branch_calls'] = exclusive_calls
 
@@ -286,30 +275,30 @@ class RecursiveAlgorithmAnalyzer:
         # Clasificar patrón basado en estructura de argumentos
         if num_calls == 1:
             if has_division:
-                return {'pattern_type': 'divide_conquer'}  # T(n) = T(n/2) + c
+                return {'pattern_type': 'divide_conquer', 'has_division': has_division, 'has_subtraction': has_subtraction, 'has_multiple_subtractions': has_multiple_subtractions}
             else:
-                return {'pattern_type': 'linear'}  # T(n) = T(n-1) + c
+                return {'pattern_type': 'linear', 'has_division': has_division, 'has_subtraction': has_subtraction, 'has_multiple_subtractions': has_multiple_subtractions}
         
         elif num_calls == 2:
             if exclusive_branch_calls:
-                return {'pattern_type': 'binary_exclusive'}
+                return {'pattern_type': 'binary_exclusive', 'has_division': has_division, 'has_subtraction': has_subtraction, 'has_multiple_subtractions': has_multiple_subtractions}
             if has_multiple_subtractions:
                 # Fibonacci: T(n) = T(n-1) + T(n-2)
-                return {'pattern_type': 'binary'}
+                return {'pattern_type': 'binary', 'has_division': has_division, 'has_subtraction': has_subtraction, 'has_multiple_subtractions': has_multiple_subtractions}
             elif has_division:
                 # Merge Sort: T(n) = 2T(n/2) + n
-                return {'pattern_type': 'divide_conquer'}
+                return {'pattern_type': 'divide_conquer', 'has_division': has_division, 'has_subtraction': has_subtraction, 'has_multiple_subtractions': has_multiple_subtractions}
             elif no_operators_in_args or has_mid_variable:
                 # No hay operadores en argumentos - probablemente divide & conquer con variables
                 # (como merge_sort que usa middle = (left + right) / 2)
                 # Asumir divide_conquer para 2 llamadas sin decrementos obvios
-                return {'pattern_type': 'divide_conquer'}
+                return {'pattern_type': 'divide_conquer', 'has_division': has_division, 'has_subtraction': has_subtraction, 'has_multiple_subtractions': has_multiple_subtractions}
             else:
-                # Otros casos binarios
-                return {'pattern_type': 'binary'}
+                # Con dos llamadas y restas iguales (e.g. quick_sort con pi-1 y pi+1) asumimos divide & conquer
+                return {'pattern_type': 'divide_conquer', 'has_division': has_division, 'has_subtraction': has_subtraction, 'has_multiple_subtractions': has_multiple_subtractions}
         
         else:
-            return {'pattern_type': 'multiple', 'call_count': num_calls}
+            return {'pattern_type': 'multiple', 'call_count': num_calls, 'has_division': has_division, 'has_subtraction': has_subtraction, 'has_multiple_subtractions': has_multiple_subtractions}
     
     def _derive_recurrence_relation(self, function_node: Function, recursive_calls: List[Dict[str, Any]], exclusive_branch_calls: bool) -> Optional[str]:
         """Derivar la relación de recurrencia a partir de la estructura de la función."""
@@ -317,22 +306,37 @@ class RecursiveAlgorithmAnalyzer:
         if not recursive_calls:
             return None
         
+        # Si las llamadas recursivas están en ramas mutuamente exclusivas (p.ej. búsqueda binaria),
+        # sólo se ejecuta una llamada por nivel: T(n) = T(n/2) + O(1)
+        if exclusive_branch_calls:
+            return "T(n) = T(n/2) + O(1)"
+
         num_calls = len(recursive_calls)
         
         # Usar análisis de patrones mejorado
         pattern_info = self._analyze_call_pattern(recursive_calls, exclusive_branch_calls)
         pattern_type = pattern_info.get('pattern_type', 'none')
+        has_division = pattern_info.get('has_division', False)
+        has_subtraction = pattern_info.get('has_subtraction', False)
+        has_multiple_subtractions = pattern_info.get('has_multiple_subtractions', False)
+        uses_size_param = self._calls_use_size_param(recursive_calls, function_node)
         
         # Generar relación basada en el patrón detectado
         if pattern_type == 'linear':
             return "T(n) = T(n-1) + O(1)"
         elif pattern_type == 'binary':
-            # Fibonacci pattern
+            # Si no hay restas múltiples ni división, asumimos ramas exclusivas (ej. búsqueda binaria) -> 1 llamada por nivel
+            if not has_multiple_subtractions:
+                # trabajo adicional lineal si no se detecta otra cosa
+                return "T(n) = T(n/2) + O(n)"
             return "T(n) = T(n-1) + T(n-2) + O(1)"
         elif pattern_type == 'binary_exclusive':
             return "T(n) = T(n/2) + O(1)"
         elif pattern_type == 'divide_conquer':
             # Divide & Conquer pattern
+            # Caso especial: dos llamadas con n-1 (torres de Hanoi) -> exponencial
+            if num_calls == 2 and has_subtraction and not has_division and uses_size_param:
+                return "T(n) = 2T(n-1) + O(1)"
             if num_calls == 1:
                 return "T(n) = T(n/2) + O(1)"
             elif num_calls == 2:
@@ -430,6 +434,26 @@ class RecursiveAlgorithmAnalyzer:
             return 'mid' in arg.name.lower()
         if isinstance(arg, BinOp):
             return self._argument_mentions_midpoint(arg.left) or self._argument_mentions_midpoint(arg.right)
+        return False
+
+    def _calls_use_size_param(self, recursive_calls: List[Dict[str, Any]], function_node: Function) -> bool:
+        """Detecta si las llamadas recursivas restan sobre el parametro de tamano (e.g., n-1)."""
+        param_names = []
+        try:
+            param_names = [str(p.name if hasattr(p, 'name') else p) for p in getattr(function_node, 'params', [])]
+        except Exception:
+            param_names = []
+
+        for info in recursive_calls:
+            call_node = info.get('node')
+            if not call_node or not hasattr(call_node, 'args'):
+                continue
+            for arg in call_node.args:
+                if isinstance(arg, BinOp) and getattr(arg, 'op', None) == '-':
+                    if isinstance(arg.left, Var):
+                        left_name = str(getattr(arg.left, 'name', '')).lower()
+                        if left_name in [p.lower() for p in param_names] or left_name == 'n':
+                            return True
         return False
     
     def _generate_function_key(self, function_node: Function) -> str:

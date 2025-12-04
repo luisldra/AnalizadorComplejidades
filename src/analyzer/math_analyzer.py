@@ -63,7 +63,7 @@ class MathematicalAnalyzer:
             
             elif isinstance(expr_or_eq, sympy.Expr):
                 simplified = self._normalize_order_expr(sympy.simplify(expr_or_eq))
-                return sympy.O(simplified, (self.n, sympy.oo))
+                return self._safe_big_o(simplified)
             
             else:
                 return "Tipo de resultado desconocido"
@@ -88,10 +88,16 @@ class MathematicalAnalyzer:
             solution = sympy.rsolve(eq, self.T(self.n))
             if solution:
                 try:
-                    simplified = self._normalize_order_expr(sympy.simplify(solution.expand()))
-                    return sympy.O(simplified, (self.n, sympy.oo))
+                    # Reemplazar constantes de integración (C0, C1, ...) por 1 para evitar problemas en O()
+                    solution_clean = solution
+                    for sym in solution.free_symbols:
+                        if sym.name.startswith("C"):
+                            solution_clean = solution_clean.subs(sym, 1)
+
+                    simplified = self._normalize_order_expr(sympy.simplify(solution_clean.expand()))
+                    return self._safe_big_o(simplified)
                 except NotImplementedError:
-                    fallback_eq = self._fallback_from_equation(eq)
+                    fallback_eq = self._fallback_from_equation(eq, func_name=func_name)
                     if fallback_eq:
                         return fallback_eq
                     fallback = self._fallback_complexity(func_name)
@@ -105,7 +111,7 @@ class MathematicalAnalyzer:
         a, b, f_n, is_div_conquer = self._extract_master_theorem_params(eq)
 
         if not is_div_conquer:
-            fallback_eq = self._fallback_from_equation(eq)
+            fallback_eq = self._fallback_from_equation(eq, func_name=func_name)
             if fallback_eq:
                 return fallback_eq
             fallback = self._fallback_complexity(func_name)
@@ -114,7 +120,7 @@ class MathematicalAnalyzer:
             return "La recurrencia no está en una forma resoluble (lineal o D&C)"
 
         if a < 1 or b <= 1:
-            fallback_eq = self._fallback_from_equation(eq)
+            fallback_eq = self._fallback_from_equation(eq, func_name=func_name)
             if fallback_eq:
                 return fallback_eq
             fallback = self._fallback_complexity(func_name)
@@ -150,7 +156,7 @@ class MathematicalAnalyzer:
                 return f"No se pudo determinar el caso del Teorema Maestro para el límite={ratio_limit}"
 
         except Exception as e:
-            fallback_eq = self._fallback_from_equation(eq)
+            fallback_eq = self._fallback_from_equation(eq, func_name=func_name)
             if fallback_eq:
                 return fallback_eq
             fallback = self._fallback_complexity(func_name)
@@ -617,10 +623,56 @@ class MathematicalAnalyzer:
                 expr = sp.log(n)
 
             return expr
-
         except Exception:
-            # Si algo falla, devolvemos la expresión original
             return expr
+
+    def _safe_big_o(self, expr: Any) -> Any:
+        """
+        Calcula O(expr) evitando fallos por expresiones como Max o series no soportadas.
+        """
+        import sympy as sp
+
+        # Si hay Max en la expresion, reemplazar por el argumento dominante en n
+        if hasattr(expr, "has") and expr.has(sp.Max):
+            max_terms = list(expr.atoms(sp.Max))
+            for m in max_terms:
+                best = None
+                best_degree = None
+                for arg in m.args:
+                    try:
+                        deg = sp.degree(sp.Poly(arg, self.n))
+                    except Exception:
+                        deg = None
+                    if best is None or (deg is not None and (best_degree is None or deg > best_degree)):
+                        best = arg
+                        best_degree = deg
+                if best is not None:
+                    expr = expr.xreplace({m: best})
+
+        try:
+            return sp.O(expr, (self.n, sp.oo))
+        except Exception:
+            # Fallback genérico
+            try:
+                return sp.O(sp.simplify(expr), (self.n, sp.oo))
+            except Exception:
+                # Heurística para combinaciones exponenciales (e.g., Fibonacci)
+                pow_terms = [p for p in expr.atoms(sp.Pow) if p.exp == self.n or (hasattr(p.exp, "has") and p.exp.has(self.n))]
+                if pow_terms:
+                    try:
+                        bases = []
+                        for p in pow_terms:
+                            if p.exp == self.n:
+                                bases.append(sp.Abs(p.base))
+                        if bases:
+                            dominant = max(bases)
+                            return sp.O(dominant**self.n, (self.n, sp.oo))
+                    except Exception:
+                        pass
+                return "O(?)"
+
+        # Si no pudimos calcular nada, devolvemos la expresión original como string
+        return "O(?)"
 
     def _fallback_complexity(self, func_name: Optional[str]) -> Optional[str]:
         if not func_name:
@@ -649,7 +701,7 @@ class MathematicalAnalyzer:
 
         return None
 
-    def _fallback_from_equation(self, eq: Any, func_name: str) -> Optional[str]:
+    def _fallback_from_equation(self, eq: Any, func_name: Optional[str] = None) -> Optional[str]:
         """
         Heurísticos por patrón cuando Sympy no puede resolver bien la recurrencia.
         """
@@ -682,6 +734,10 @@ class MathematicalAnalyzer:
             # (merge sort / divide & conquer balanceado)
             if rhs.has(2 * self.T(n / 2)):
                 return "O(n*log(n))"
+
+            # Caso 4: T(n) = T(n-1) + T(n-2) + c  -> O(2^n) (Fibonacci)
+            if rhs.has(self.T(n - 1)) and rhs.has(self.T(n - 2)):
+                return "O(2**n)"
 
             return None
 

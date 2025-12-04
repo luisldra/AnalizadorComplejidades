@@ -1,0 +1,36 @@
+function lcs_length(a, b, n, m)
+begin
+    for i = 0 to n do
+    begin
+        dp[i][0] = 0
+    end
+
+    for j = 0 to m do
+    begin
+        dp[0][j] = 0
+    end
+
+    for i = 1 to n do
+    begin
+        for j = 1 to m do
+        begin
+            if a[i - 1] == b[j - 1]
+            begin
+                dp[i][j] = 1 + dp[i - 1][j - 1]
+            end
+            else
+            begin
+                if dp[i - 1][j] >= dp[i][j - 1]
+                begin
+                    dp[i][j] = dp[i - 1][j]
+                end
+                else
+                begin
+                    dp[i][j] = dp[i][j - 1]
+                end
+            end
+        end
+    end
+
+    return dp[n][m]
+end

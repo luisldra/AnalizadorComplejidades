@@ -10,10 +10,14 @@ RESTRICCIONES MUY IMPORTANTES (OBLIGATORIAS):
 - NO uses el operador punto '.' EN NINGUN CONTEXTO.
   Prohibido: a.b, lista.length, nodo.siguiente, etc.
 - NO uses '->', '::', '+=', '-=', '&&', '||', '!' ni operadores de otros lenguajes.
+- NO uses literales negativos (la gramática no soporta -1 como literal directo). Usa 0 para indicar fallo o una variable con valor no negativo.
 - Si necesitas la longitud de una lista/arreglo, DEBES recibirla como
   parametro (por ejemplo 'n') o usar una variable 'n' ya definida.
   Prohibido: lista.length
   Permitido: if i == n - 1 then ...
+- Usa SIEMPRE palabras clave y operadores logicos en minusculas porque la gramatica los define asi:
+  * Operadores logicos: and, or, not (no uses AND/OR/NOT en mayusculas).
+  * Palabras clave: function, begin, end, if, then, else, for, while, do, return, call.
 
 - Solo puedes usar:
   * Identificadores (nombres de variables y funciones)

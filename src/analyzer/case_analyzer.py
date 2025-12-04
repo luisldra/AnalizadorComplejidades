@@ -58,11 +58,9 @@ class CaseAnalyzer:
 
         Orden de prioridad:
         1) Patrón estructural en el AST (más fiable para casos concretos).
-        2) Nombre de la función (pistas como 'busqueda_binaria', 'es_primo', etc.).
-        3) Ecuación de recurrencia / complejidad matemática (para afinar tipo).
-        4) Fallback puramente matemático si no hay nada más.
+        2) Ecuación de recurrencia / complejidad matemática (para afinar tipo).
+        3) Fallback puramente matemático si no hay nada más.
         """
-        # --- Nombre de la función para heurísticas por nombre ---
         func_name = ""
         if hasattr(ast, 'functions') and ast.functions:
             func_name = ast.functions[0].name.lower()
@@ -173,7 +171,7 @@ class CaseAnalyzer:
             return "divide_conquer"
 
         # --- EXPONENCIAL GENERAL ---
-        if "2^" in complexity_low or "exp(" in complexity_low or "φ" in complexity_low:
+        if "2^" in complexity_low or "exp(" in complexity_low or "2" in complexity_low:
             # Si el patrón AST es fibonacciesco pero el nombre no lo dice
             recursive_calls = self._count_active_recursive_calls(ast)
             if recursive_calls >= 2:
@@ -751,11 +749,11 @@ class CaseAnalyzer:
         worst_cases = {
             "fibonacci": CaseAnalysis(
                 case_type="worst",
-                complexity="Θ(φⁿ) ≈ Θ(2ⁿ)",
+                complexity="Θ(2ⁿ) ≈ Θ(2ⁿ)",
                 scenario="Cualquier valor n > 1 (el algoritmo es determinista).",
                 ejemplo=f"{func_name}(10) genera ~2¹⁰ ≈ 1024 llamadas recursivas en un árbol binario.",
                 explanation=(
-                    "Fibonacci recursivo sin memoización SIEMPRE es exponencial. La base exacta es φ≈1.618, "
+                    "Fibonacci recursivo sin memoización SIEMPRE es exponencial. La base exacta es 2≈1.618, "
                     "pero O(2ⁿ) es la cota superior estándar. No hay 'mejor o peor entrada', sólo depende de n."
                 ),
             ),
@@ -834,9 +832,9 @@ class CaseAnalyzer:
         average_cases = {
             "fibonacci": CaseAnalysis(
                 case_type="average",
-                complexity="Θ(φⁿ) ≈ Θ(2ⁿ)",
+                complexity="Θ(2ⁿ) ≈ Θ(2ⁿ)",
                 scenario="Cualquier valor n > 1 (no depende de los datos, solo de n).",
-                ejemplo=f"{func_name}(n) siempre genera ~φⁿ llamadas, donde φ = 1.618...",
+                ejemplo=f"{func_name}(n) siempre genera ~2ⁿ llamadas, donde 2 = 1.618...",
                 explanation=(
                     "Fibonacci recursivo es determinista: para un n dado, siempre ejecuta la misma cantidad de operaciones. "
                     "No tiene 'caso promedio' en el sentido tradicional porque no depende de la disposición de datos."

@@ -17,7 +17,7 @@ class LLMWindow(tk.Toplevel):
     def __init__(self, parent, orchestrator: AnalysisOrchestrator):
         super().__init__(parent)
         self.title("AI - Asistente IA - Generador y Auditor")
-        self.geometry("1100x750")
+        self.state('zoomed')  # Maximizar ventana (Windows)
 
         self.orchestrator = orchestrator
         self.gemini = None  # Inicializacion lazy

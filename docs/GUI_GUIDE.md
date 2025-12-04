@@ -43,7 +43,7 @@ Al abrir se cargan los ejemplos de `examples/` en la lista de la izquierda.
 Se muestran en el reporte cuando existe recurrencia reconocible. Ejemplos:
 - `T(n)=T(n/2)+c`: Nivel k → 1 nodo tamaño n/2^k; costo nivel ≈ c; altura ≈ log n.
 - `T(n)=2T(n/2)+n`: Nivel k → 2^k nodos tamaño n/2^k; costo nivel ≈ n; altura ≈ log n.
-- `T(n)=T(n-1)+T(n-2)+c`: Nivel k → ~φ^k nodos; costo nivel ≈ φ^k; altura ≈ n.
+- `T(n)=T(n-1)+T(n-2)+c`: Nivel k → ~2^k nodos; costo nivel ≈ 2^k; altura ≈ n.
 
 ## 6. Problemas frecuentes
 - **No aparece la pestaña Árbol**: el algoritmo no es recursivo. Usa la pestaña Flujo.

@@ -42,7 +42,7 @@ class MainWindow:
         paned.add(left_frame, weight=1)
         
         # BOTÓN IA 
-        btn_ai = ttk.Button(left_frame, text="✨ ASISTENTE IA (Generar)", command=self._open_ai_window)
+        btn_ai = ttk.Button(left_frame, text="ASISTENTE IA", command=self._open_ai_window)
         btn_ai.pack(fill=tk.X, padx=5, pady=5)
         
         self.tree_list = ttk.Treeview(left_frame, columns=("status", "comp"), show="headings")
@@ -53,7 +53,7 @@ class MainWindow:
         self.tree_list.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
         self.tree_list.bind("<<TreeviewSelect>>", self._on_item_selected)
         
-        ttk.Button(left_frame, text="🔄 Recargar", command=self._load_initial_data).pack(fill=tk.X, padx=5, pady=5)
+        ttk.Button(left_frame, text="Recargar", command=self._load_initial_data).pack(fill=tk.X, padx=5, pady=5)
 
         # Derecha
         right_frame = ttk.Frame(paned)
@@ -63,8 +63,8 @@ class MainWindow:
         self.notebook.pack(fill=tk.BOTH, expand=True)
         
         # Pestañas
-        self.txt_report = self._create_tab_content("📊 Reporte", "text")
-        self.txt_code = self._create_tab_content("📝 Código", "text")
+        self.txt_report = self._create_tab_content("Reporte", "text")
+        self.txt_code = self._create_tab_content("Código", "text")
         
         # Frames para gráficos (se inicializan pero no se agregan al notebook aún)
         self.frame_tree = ttk.Frame(self.notebook)
@@ -116,7 +116,6 @@ class MainWindow:
                 timing_ms = (time.perf_counter() - total_start) * 1000
             timing_rows.append((result.filename, timing_ms))
 
-        # Imprimir tiempos de análisis por archivo y total (solo al cargar una vez)
         if not getattr(self, "_timing_printed", False):
             total_ms = (time.perf_counter() - total_start) * 1000
             print("\nTiempos de análisis inicial:")
@@ -165,11 +164,11 @@ class MainWindow:
         else:
             w(f"  • Expresión de costo: {res.math_expression}")
             
-        w(f"  • Complejidad Derivada: {res.math_complexity}")
-        w("└" + "─"*90 + "┘\n")
+        # w(f"  • Complejidad Derivada: {res.math_complexity}")
+        w("└" + "─"*94 + "┘\n")
 
         # 2. Heurístico
-        w("┌─ 📐 ECUACIÓN DE RECURRENCIA Y COMPLEJIDAD ASINTÓTICA (HEURÍSTICO) " + "─"*34 + "┐", "box")
+        w("┌─ 📐 ECUACIÓN DE RECURRENCIA Y COMPLEJIDAD ASINTÓTICA" + "─"*34 + "┐", "box")
         w(f"  Ecuación de Recurrencia GENERAL:")
         w(f"    {res.heur_equation}\n")
         

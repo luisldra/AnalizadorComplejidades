@@ -38,7 +38,18 @@ class ASTTransformer(Transformer):
     def for_statement(self, _for, name, _assign, start, _to, end, _do, body):
         return For(str(name), start, end, body)
 
-    def while_statement(self, cond, body):
+    def while_statement(self, *args):
+        """
+        Normaliza las distintas formas de while:
+        WHILE cond block
+        WHILE (cond) block
+        WHILE cond DO block
+        WHILE (cond) DO block
+        Con @v_args(inline=True) pueden llegar tokens extra; tomamos los dos
+        últimos elementos como (cond, body).
+        """
+        cond = args[-2]
+        body = args[-1]
         return While(cond, body)
 
     def if_statement(self, *args):
@@ -85,6 +96,11 @@ class ASTTransformer(Transformer):
 
     def sub(self, left, right):
         return BinOp(left, '-', right)
+
+    def neg(self, value):
+        if isinstance(value, Number):
+            return Number(-value.value)
+        return BinOp(Number(0), '-', value)
 
     def mul(self, left, right):
         return BinOp(left, '*', right)

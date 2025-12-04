@@ -91,7 +91,8 @@ args: expr ("," expr)*
      | term "/" factor -> div
      | term "%" factor -> mod
 
-?factor: NUMBER
+?factor: "-" factor     -> neg
+       | NUMBER
        | NAME
        | NAME "[" expr "]"   -> array_access
        | NAME "[" expr "]" "[" expr "]" -> matrix_access
