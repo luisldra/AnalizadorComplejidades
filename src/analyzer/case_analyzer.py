@@ -43,8 +43,6 @@ class CaseAnalyzer:
     
     Identifica patrones comunes y escenarios típicos para diferentes
     estructuras algorítmicas.
-    Nota: combina heurísticas por AST, nombre de función y complejidad/recurrencia
-    para producir escenarios legibles en el reporte.
     """
     
     def __init__(self):
@@ -92,39 +90,14 @@ class CaseAnalyzer:
             # Si algo falla en el refinamiento, seguimos con el tipo que teníamos
             pass
 
-        # --- 3) Forzar patrones bien conocidos independientemente de lo anterior ---
-
-        # 3.a) Búsqueda binaria: por nombre o por patrón de división + recursión
-        if (
-            'busqueda_binaria' in func_name
-            or 'binary_search' in func_name
-            or self._has_binary_search_pattern(ast)
-        ):
-            algorithm_type = 'binary_search'
-
-        # 3.b) Test de primalidad ingenuo: bucle con n % i == 0 y return dentro (protegido)
-        if self._is_prime_like_pattern_safe(ast):
-            algorithm_type = 'prime_test'
-
-        # --- 4) Si no tenemos nada de info matemática, usamos el fallback puramente matemático ---
+        # Si no tenemos nada de info matemática, usamos el fallback puramente matemático ---
         if not complexity and not recurrence_eq:
             return self._build_math_based_cases(recurrence_eq, complexity)
 
-        # --- 5) Construir los tres casos en función del tipo que quedó ---
+        # Construir los tres casos en función del tipo que quedó ---
         best_case = self._analyze_best_case(ast, algorithm_type, comp_str)
         worst_case = self._analyze_worst_case(ast, algorithm_type, comp_str)
         average_case = self._analyze_average_case(ast, algorithm_type, comp_str)
-
-        # Ajustes específicos por nombre/patrón
-        func_name_lower = func_name.lower()
-        if algorithm_type == 'fibonacci' or 'fib' in func_name_lower:
-            best_case.complexity = "Θ(2^n)"
-            worst_case.complexity = "Θ(2^n)"
-            average_case.complexity = "Θ(2^n)"
-
-        if algorithm_type == 'divide_conquer' and ('quick' in func_name_lower or 'qsort' in func_name_lower):
-            # Peor caso clásico de QuickSort desbalanceado
-            worst_case.complexity = "Θ(n^2)"
 
         return {
             'best': best_case,
@@ -142,16 +115,8 @@ class CaseAnalyzer:
         recurrence = (recurrence or "").replace(" ", "")
         complexity_low = (complexity or "").lower()
 
-        # Nombre de la función, por si ayuda (fib, hanoi, etc.)
-        func_name = ""
-        if hasattr(ast, "functions") and ast.functions:
-            func_name = ast.functions[0].name.lower()
-
         # --- FIBONACCI / EXPONENCIAL ---
         if "t(n-1)" in recurrence and "t(n-2)" in recurrence:
-            return "fibonacci"
-
-        if "fib" in func_name:
             return "fibonacci"
 
         # --- BÚSQUEDA BINARIA ---
@@ -162,7 +127,6 @@ class CaseAnalyzer:
             if "log" in complexity_low and "nlog" not in complexity_low and "2^" not in complexity_low:
                 return "binary_search"
 
-        # Además, si el AST muestra división de intervalo a la mitad, lo forzamos
         if self._has_binary_search_pattern(ast):
             return "binary_search"
 
@@ -205,7 +169,7 @@ class CaseAnalyzer:
         if has_binary_search:
             return 'binary_search'
         elif is_fibonacci:
-            return 'fibonacci'  # Detectar Fibonacci ANTES de divide_conquer
+            return 'fibonacci' 
         elif has_divide_conquer:
             return 'divide_conquer'
         elif has_recursion:
@@ -442,26 +406,13 @@ class CaseAnalyzer:
         return False
     
     def _is_prime_like_pattern(self, ast) -> bool:
-        """
-        Detecta un test de primalidad ingenuo del estilo:
 
-            for i = 2 to n-1:
-                if n % i == 0:
-                    return 0
-            return 1
-
-        Criterios:
-          - Nombre de la función contenga 'primo' o 'prime', o
-          - Exista un bucle con una condición que use módulo (%) y un return dentro.
-        """
-        # Pista por nombre
         if hasattr(ast, 'functions') and ast.functions:
             func = ast.functions[0]
             name = func.name.lower()
             if 'primo' in name or 'prime' in name:
                 return True
 
-        # Pista estructural: bucle + condición con módulo + return
         return self._has_modulo_guard_with_return(ast)
 
     def _has_modulo_guard_with_return(self, node) -> bool:

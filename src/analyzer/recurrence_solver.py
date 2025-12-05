@@ -19,8 +19,6 @@ from src.analyzer.advanced_complexity import ComplexityResult
 class RecurrenceSolver:
     """
     Resuelve relaciones de recurrencia utilizando técnicas de Programación Dinámica.
-    
-    Responsabilidad: Resolución matemática de relaciones de recurrencia.
     """
     
     @lru_cache(maxsize=1000)  # DP memoization decorator
@@ -202,13 +200,13 @@ class RecursiveAlgorithmAnalyzer:
                 traverse(getattr(node, 'then_body', None), depth + 1)
                 traverse(getattr(node, 'else_body', None), depth + 1)
             
-            # Retornos (AQUÍ ESTABA EL ERROR PRINCIPAL)
+            # Retornos 
             elif isinstance(node, Return):
                 # Tu parser usa 'expr', otros usan 'value'. Buscamos ambos.
                 traverse(getattr(node, 'expr', None), depth)
                 traverse(getattr(node, 'value', None), depth)
             
-            # Asignaciones (ERROR DE LA IA)
+            # Asignaciones
             elif isinstance(node, Assignment):
                 # Tu parser usa 'expr', otros usan 'value'. Buscamos ambos.
                 traverse(getattr(node, 'expr', None), depth)
